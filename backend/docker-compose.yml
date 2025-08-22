@@ -1,0 +1,16 @@
+# docker-compose.yml
+version: "3.8"
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin-crawl
+      POSTGRES_DB: crawl-data
+    ports:
+      - "54325:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+volumes:
+  db_data:
