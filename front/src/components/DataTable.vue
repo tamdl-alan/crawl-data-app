@@ -221,9 +221,7 @@ watch(() => props.data, () => {
               :value="item[column.key]"
               :item="item"
             />
-            <span v-else>
-              {{ renderCell(item, column, index) }}
-            </span>
+            <span v-else v-html="renderCell(item, column, index)"></span>
           </td>
           <td class="before:hidden lg:w-1 whitespace-nowrap">
             <BaseButtons type="justify-start lg:justify-end" no-wrap>

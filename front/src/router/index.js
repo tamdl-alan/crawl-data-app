@@ -38,6 +38,14 @@ const routes = [
   },
   {
     meta: {
+      title: 'Crawled Data',
+    },
+    path: '/crawled-data',
+    name: 'crawled-data',
+    component: () => import('@/views/CrawledDataView.vue'),
+  },
+  {
+    meta: {
       title: 'Forms',
     },
     path: '/forms',

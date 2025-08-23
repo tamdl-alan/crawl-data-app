@@ -30,6 +30,11 @@ export default [
     icon: mdiTable,
   },
   {
+    to: '/crawled-data',
+    label: 'Crawled Data',
+    icon: mdiTable,
+  },
+  {
     to: '/forms',
     label: 'Forms',
     icon: mdiSquareEditOutline,
