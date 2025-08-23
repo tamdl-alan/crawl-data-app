@@ -2,16 +2,17 @@
 import { mdiForwardburger, mdiBackburger } from '@mdi/js'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth.js'
 import menuAside from '@/menuAside.js'
 import menuNavBar from '@/menuNavBar.js'
 import { useDarkModeStore } from '@/stores/darkMode.js'
 import BaseIcon from '@/components/BaseIcon.vue'
-import FormControl from '@/components/FormControl.vue'
 import NavBar from '@/components/NavBar.vue'
 import NavBarItemPlain from '@/components/NavBarItemPlain.vue'
 import AsideMenu from '@/components/AsideMenu.vue'
 
 const darkModeStore = useDarkModeStore()
+const authStore = useAuthStore()
 
 const router = useRouter()
 
@@ -46,7 +47,8 @@ const menuClick = (event, item) => {
   }
 
   if (item.isLogout) {
-    //
+    authStore.logout()
+    router.push('/login')
   }
 }
 </script>
@@ -77,6 +79,13 @@ const menuClick = (event, item) => {
           :title="isAsideLgActive ? 'Hide Sidebar' : 'Show Sidebar'"
         >
           <BaseIcon :path="isAsideLgActive ? mdiBackburger : mdiForwardburger" size="24" />
+        </NavBarItemPlain>
+        <NavBarItemPlain use-margin>
+          <input
+            type="text"
+            placeholder="Search (ctrl+k)"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+          />
         </NavBarItemPlain>
       </NavBar>
       <AsideMenu
