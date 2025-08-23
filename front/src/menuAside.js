@@ -25,6 +25,11 @@ export default [
     icon: mdiTable,
   },
   {
+    to: '/products',
+    label: 'Products',
+    icon: mdiTable,
+  },
+  {
     to: '/forms',
     label: 'Forms',
     icon: mdiSquareEditOutline,

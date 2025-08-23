@@ -1,11 +1,13 @@
 import express from "express";
 import dotenv from "dotenv";
 import { Pool } from "pg";
+import cors from "cors";
 import { createProductRoutes } from './routes/productRoutes.js';
 
 dotenv.config();
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54325/crawl-data",

@@ -30,6 +30,14 @@ const routes = [
   },
   {
     meta: {
+      title: 'Products',
+    },
+    path: '/products',
+    name: 'products',
+    component: () => import('@/views/ProductView.vue'),
+  },
+  {
+    meta: {
       title: 'Forms',
     },
     path: '/forms',
