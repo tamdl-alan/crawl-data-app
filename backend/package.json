@@ -8,7 +8,8 @@
     "build": "tsc",
     "serve": "node dist/index.js",
     "migrate:up": "tsx src/migrate.ts up",
-    "migrate:down": "tsx src/migrate.ts down"
+    "migrate:down": "tsx src/migrate.ts down",
+    "init-crawled-data": "tsx src/init-crawled-data.js"
   },
   "dependencies": {
     "dotenv": "^17.2.1",

@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import { Pool } from "pg";
 import { createProductRoutes } from './routes/productRoutes.js';
+import { createCrawledDataRoutes } from './routes/crawledDataRoutes.js';
 
 dotenv.config();
 const app = express();
@@ -22,8 +23,11 @@ app.get("/", async (_req, res) => {
   }
 });
 
-// Product routes
+// Product routes (old table)
 app.use('/products', createProductRoutes(pool));
+
+// Crawled data routes (new table)
+app.use('/crawled-data', createCrawledDataRoutes(pool));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
