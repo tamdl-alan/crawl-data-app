@@ -54,7 +54,7 @@ window.addEventListener('keydown', (e) => {
   <OverlayLayer v-show="value" @overlay-click="cancel">
     <CardBox
       v-show="value"
-      class="shadow-lg max-h-modal w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 z-50"
+      class="shadow-lg max-h-[90vh] w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 z-50 flex flex-col"
       is-modal
     >
       <CardBoxComponentTitle :title="title">
@@ -68,7 +68,7 @@ window.addEventListener('keydown', (e) => {
         />
       </CardBoxComponentTitle>
 
-      <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
+      <div class="flex-1 overflow-y-auto min-h-0 space-y-3 px-2">
         <slot />
       </div>
 
