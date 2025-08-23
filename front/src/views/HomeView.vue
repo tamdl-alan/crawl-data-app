@@ -14,14 +14,14 @@ import * as chartConfig from '@/components/Charts/chart.config.js'
 // import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBoxWidget from '@/components/CardBoxWidget.vue'
-import CardBox from '@/components/CardBox.vue'
-import TableSampleClients from '@/components/TableSampleClients.vue'
+// import CardBox from '@/components/CardBox.vue'
+// import TableSampleClients from '@/components/TableSampleClients.vue'
 // import NotificationBar from '@/components/NotificationBar.vue'
 // import BaseButton from '@/components/BaseButton.vue'
 // import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
 // import CardBoxClient from '@/components/CardBoxClient.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
-import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
+// import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 
 const chartData = ref(null)
 
@@ -51,7 +51,7 @@ onMounted(() => {
           color="text-emerald-500"
           :icon="mdiAccountMultiple"
           :number="512"
-          label="Clients"
+          label="Coming Soon"
         />
         <CardBoxWidget
           trend="12%"
@@ -59,8 +59,7 @@ onMounted(() => {
           color="text-blue-500"
           :icon="mdiCartOutline"
           :number="7770"
-          prefix="$"
-          label="Sales"
+          label="Coming Soon"
         />
         <CardBoxWidget
           trend="Overflow"
@@ -69,7 +68,7 @@ onMounted(() => {
           :icon="mdiChartTimelineVariant"
           :number="256"
           suffix="%"
-          label="Performance"
+          label="Coming Soon"
         />
       </div>
 
@@ -98,15 +97,15 @@ onMounted(() => {
         </div>
       </div> -->
 
-      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Clients" />
+      <!-- <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Clients" /> -->
 <!-- 
       <NotificationBar color="info" :icon="mdiMonitorCellphone">
         <b>Responsive table.</b> Collapses on mobile
       </NotificationBar> -->
 
-      <CardBox has-table>
+      <!-- <CardBox has-table>
         <TableSampleClients />
-      </CardBox>
+      </CardBox> -->
     </SectionMain>
   </LayoutAuthenticated>
 </template>

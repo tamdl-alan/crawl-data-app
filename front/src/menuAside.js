@@ -4,7 +4,7 @@ import {
   // mdiGithub,
   // mdiLock,
   // mdiAlertCircle,
-  mdiSquareEditOutline,
+  // mdiSquareEditOutline,
   mdiTable,
   // mdiViewList,
   // mdiTelevisionGuide,
@@ -19,11 +19,11 @@ export default [
     icon: mdiMonitor,
     label: 'Dashboard',
   },
-  {
-    to: '/tables',
-    label: 'Tables',
-    icon: mdiTable,
-  },
+  // {
+  //   to: '/tables',
+  //   label: 'Tables',
+  //   icon: mdiTable,
+  // },
   {
     to: '/products',
     label: 'Products',
@@ -34,9 +34,9 @@ export default [
     label: 'Crawled Data',
     icon: mdiTable,
   },
-  {
-    to: '/forms',
-    label: 'Forms',
-    icon: mdiSquareEditOutline,
-  },
+  // {
+  //   to: '/forms',
+  //   label: 'Forms',
+  //   icon: mdiSquareEditOutline,
+  // },
 ]

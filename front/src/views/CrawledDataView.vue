@@ -187,6 +187,7 @@ onMounted(() => {
           :icon="mdiPlus"
           label="Add Data"
           color="success"
+          disabled
           @click="handleAddData"
         />
       </SectionTitleLineWithButton>

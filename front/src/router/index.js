@@ -20,14 +20,14 @@ const routes = [
     name: 'dashboard',
     component: Home,
   },
-  {
-    meta: {
-      title: 'Tables',
-    },
-    path: '/tables',
-    name: 'tables',
-    component: () => import('@/views/TablesView.vue'),
-  },
+  // {
+  //   meta: {
+  //     title: 'Tables',
+  //   },
+  //   path: '/tables',
+  //   name: 'tables',
+  //   component: () => import('@/views/TablesView.vue'),
+  // },
   {
     meta: {
       title: 'Products',
@@ -44,14 +44,14 @@ const routes = [
     name: 'crawled-data',
     component: () => import('@/views/CrawledDataView.vue'),
   },
-  {
-    meta: {
-      title: 'Forms',
-    },
-    path: '/forms',
-    name: 'forms',
-    component: () => import('@/views/FormsView.vue'),
-  },
+  // {
+  //   meta: {
+  //     title: 'Forms',
+  //   },
+  //   path: '/forms',
+  //   name: 'forms',
+  //   component: () => import('@/views/FormsView.vue'),
+  // },
   {
     meta: {
       title: 'Profile',
