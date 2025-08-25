@@ -1,9 +1,12 @@
-# docker-compose.yml
+# Docker Compose cho Crawl Data App
 version: "3.8"
+
 services:
+  # PostgreSQL Database
   db:
-    image: postgres:15
-    restart: always
+    image: postgres:15-alpine
+    container_name: crawl-data-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin-crawl
@@ -11,6 +14,61 @@ services:
     ports:
       - "54325:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crawl-data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - crawl-network
+
+  # Backend API với Chrome
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crawl-data-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:admin-crawl@db:5432/crawl-data
+      - NODE_ENV=production
+      - PORT=3000
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
+      - EMAIL_SNKRDUNK=${EMAIL_SNKRDUNK:-cathoiloi1135@gmail.com}
+      - PASSWORD_SNKRDUNK=${PASSWORD_SNKRDUNK:-Sy123456}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - chrome_cache:/app/.cache
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - crawl-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+
+
 volumes:
-  db_data:
+  postgres_data:
+    driver: local
+  chrome_cache:
+    driver: local
+
+networks:
+  crawl-network:
+    driver: bridge

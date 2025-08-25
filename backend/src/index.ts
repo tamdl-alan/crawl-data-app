@@ -1,12 +1,11 @@
-require('dotenv').config();
 import express from "express";
 import dotenv from "dotenv";
 import { Pool } from "pg";
 import cors from "cors";
-const puppeteer = require('puppeteer-extra');
-const cheerio = require('cheerio');
-const axios = require('axios');
-const cron = require('node-cron');
+import puppeteer from 'puppeteer-extra';
+import * as cheerio from 'cheerio';
+import axios from 'axios';
+import cron from 'node-cron';
 
 import { createProductRoutes } from './routes/productRoutes.js';
 import { createCrawledDataRoutes } from './routes/crawledDataRoutes.js';
@@ -33,7 +32,7 @@ app.get("/", async (_req, res) => {
 });
 
 // -------------Crawl Data Start------------------
-app.get("/crawl-data", async (req: ProductModel, res: any) => {
+app.post("/crawl-data", async (req: ProductModel, res: any) => {
   if (!req) {
     res.status(400).send({ message: 'Product ID is required' });
     return;
@@ -153,7 +152,7 @@ async function crawlDataSnkrdunk(apiUrl: string, type: string) {
 }
 
 async function snkrdunkLogin() {
-  const browser = await puppeteer.launch(defaultBrowserArgs);
+  const browser = await (puppeteer as any).launch(defaultBrowserArgs);
   try {
     if (cookieHeader) {
       return
@@ -278,7 +277,7 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
   let page = null;
   
   try {
-    browserChild = await puppeteer.launch(defaultBrowserArgs);
+    browserChild = await (puppeteer as any).launch(defaultBrowserArgs);
     page = await browserChild.newPage();
     
     // Set page timeout
@@ -318,8 +317,8 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
     $('div.swiper-slide-active').each((i: any, el: any) => {
       const img = $(el).find('img');
       if (img && !imgSrc && !imgAlt) {
-        imgSrc = img.attr('src');
-        imgAlt = img.attr('alt');
+        imgSrc = img.attr('src') || '';
+        imgAlt = img.attr('alt') || '';
       }
     });
 
