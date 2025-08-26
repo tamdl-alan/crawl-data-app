@@ -32,6 +32,21 @@ app.get("/", async (_req, res) => {
   }
 });
 
+// Memory usage endpoint
+app.get("/memory", (_req, res) => {
+  const memUsage = process.memoryUsage();
+  res.json({
+    memory: {
+      rss: `${(memUsage.rss / 1024 / 1024).toFixed(2)} MB`,
+      heapUsed: `${(memUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+      heapTotal: `${(memUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+      external: `${(memUsage.external / 1024 / 1024).toFixed(2)} MB`
+    },
+    uptime: `${(process.uptime() / 60).toFixed(2)} minutes`,
+    timestamp: getVietnamTime()
+  });
+});
+
 // -------------Crawl Data Start------------------
 app.post("/crawl-data", async (req: Request, res: any) => {
   if (!req) {
@@ -39,6 +54,11 @@ app.post("/crawl-data", async (req: Request, res: any) => {
     return;
   }
   const { id, goat_url, goat_id, snkrdunk_api, type } = req.body as unknown as ProductModel;
+  
+  // Log memory usage before crawling
+  const memBefore = process.memoryUsage();
+  logMemoryUsage(`Before crawling [${goat_url}]`, memBefore);
+  
   try {
 
     console.log(`------------Crawling data [${snkrdunk_api}] SNKRDUNK Start: [${getVietnamTime()}]------------`);
@@ -66,6 +86,7 @@ app.post("/crawl-data", async (req: Request, res: any) => {
             message: `✅ Done crawling ${goat_url}`,
             savedRecords: savedRecords.length,
             totalRecords: mergedArr.length,
+            skippedRecords: mergedArr.length - savedRecords.length, // Records that were skipped
             completedAt: getVietnamTime()
           });
         }
@@ -83,6 +104,22 @@ app.post("/crawl-data", async (req: Request, res: any) => {
     console.error(`❌ Error crawling ${id}:`, error.message);
     if (!res.headersSent) {
       res.status(500).send({ message: `❌ Error crawling ${id}: ${error.message}` });
+    }
+  } finally {
+    // Log memory usage after crawling
+    const memAfter = process.memoryUsage();
+    logMemoryUsage(`After crawling [${goat_url}]`, memAfter);
+    logMemoryChanges(`Crawl [${goat_url}]`, memBefore, memAfter);
+    
+    // Force garbage collection if memory usage is high
+    if (memAfter.heapUsed > 200 * 1024 * 1024) { // 200MB threshold
+      console.log(`🧹 High memory usage detected, suggesting garbage collection...`);
+      if (global.gc) {
+        global.gc();
+        const memAfterGC = process.memoryUsage();
+        const gcReduction = memAfter.heapUsed - memAfterGC.heapUsed;
+        console.log(`🧹 After GC: ${(memAfterGC.heapUsed / 1024 / 1024).toFixed(2)} MB (freed ${(gcReduction / 1024 / 1024).toFixed(2)} MB)`);
+      }
     }
   }
 });
@@ -474,6 +511,35 @@ function getVietnamTime(): string {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
+// Helper function to log memory usage
+function logMemoryUsage(label: string, memoryUsage: NodeJS.MemoryUsage) {
+  const rss = (memoryUsage.rss / 1024 / 1024).toFixed(2);
+  const heapUsed = (memoryUsage.heapUsed / 1024 / 1024).toFixed(2);
+  const heapTotal = (memoryUsage.heapTotal / 1024 / 1024).toFixed(2);
+  const external = (memoryUsage.external / 1024 / 1024).toFixed(2);
+  
+  console.log(`🔄 ${label} Memory: RSS: ${rss}MB, Heap Used: ${heapUsed}MB, Heap Total: ${heapTotal}MB, External: ${external}MB`);
+}
+
+// Helper function to log memory changes
+function logMemoryChanges(label: string, memBefore: NodeJS.MemoryUsage, memAfter: NodeJS.MemoryUsage) {
+  const rssDiff = memAfter.rss - memBefore.rss;
+  const heapUsedDiff = memAfter.heapUsed - memBefore.heapUsed;
+  const heapTotalDiff = memAfter.heapTotal - memBefore.heapTotal;
+  const externalDiff = memAfter.external - memBefore.external;
+  
+  console.log(`📊 ${label} Memory Changes:`);
+  console.log(`   - RSS: ${(rssDiff / 1024 / 1024).toFixed(2)} MB (${rssDiff > 0 ? '+' : ''}${((rssDiff / memBefore.rss) * 100).toFixed(2)}%)`);
+  console.log(`   - Heap Used: ${(heapUsedDiff / 1024 / 1024).toFixed(2)} MB (${heapUsedDiff > 0 ? '+' : ''}${((heapUsedDiff / memBefore.heapUsed) * 100).toFixed(2)}%)`);
+  console.log(`   - Heap Total: ${(heapTotalDiff / 1024 / 1024).toFixed(2)} MB (${heapTotalDiff > 0 ? '+' : ''}${((heapTotalDiff / memBefore.heapTotal) * 100).toFixed(2)}%)`);
+  console.log(`   - External: ${(externalDiff / 1024 / 1024).toFixed(2)} MB (${externalDiff > 0 ? '+' : ''}${((externalDiff / memBefore.external) * 100).toFixed(2)}%)`);
+  
+  // Warning if memory increase is significant
+  if (heapUsedDiff > 50 * 1024 * 1024) { // 50MB threshold
+    console.warn(`⚠️ Significant memory increase detected: ${(heapUsedDiff / 1024 / 1024).toFixed(2)} MB`);
+  }
+}
+
 // Function to save crawled data to database using internal API
 async function saveCrawledDataToDatabase(crawledData: any[]) {
   if (!Array.isArray(crawledData) || crawledData.length === 0) {
@@ -484,6 +550,7 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
   console.log(`📊 Starting to save ${crawledData.length} records to database...`);
   const savedRecords = [];
   const failedRecords = [];
+  const skippedRecords = [];
   
   for (let i = 0; i < crawledData.length; i++) {
     const data = crawledData[i];
@@ -516,14 +583,21 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
 
       // Check if record already exists (same product_url and size_goat)
       const existingRecord = await pool.query(
-        `SELECT id FROM crawled_data 
-         WHERE product_url = $1 AND size_goat = $2 AND del_flag = 0`,
+        `SELECT id, del_flag FROM crawled_data 
+         WHERE product_url = $1 AND size_goat = $2`,
         [dbData.product_url, dbData.size_goat]
       );
 
+      // Skip if record exists and is soft deleted (del_flag = 2)
+      if (existingRecord.rows.length > 0 && existingRecord.rows[0].del_flag === 2) {
+        console.log(`⏭️ Skipping soft-deleted record: ${dbData.product_name} - Size: ${dbData.size_goat}`);
+        skippedRecords.push({ index: i, data: dbData, reason: 'Soft deleted record' });
+        continue;
+      }
+
       let result;
-      if (existingRecord.rows.length > 0) {
-        // Update existing record
+      if (existingRecord.rows.length > 0 && existingRecord.rows[0].del_flag === 0) {
+        // Update existing active record
         console.log(`🔄 Updating existing record for ${dbData.product_name} - Size: ${dbData.size_goat}`);
         result = await pool.query(
           `UPDATE crawled_data 
@@ -540,6 +614,7 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
         );
       } else {
         // Insert new record
+        console.log(`➕ Inserting new record for ${dbData.product_name} - Size: ${dbData.size_goat}`);
         result = await pool.query(
           `INSERT INTO crawled_data (
             product_url, product_name, size_goat, price_goat, 
@@ -568,9 +643,14 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
   console.log(`📊 Database save completed at ${getVietnamTime()}:`);
   console.log(`✅ Successfully saved: ${savedRecords.length} records`);
   console.log(`❌ Failed to save: ${failedRecords.length} records`);
+  console.log(`⏭️ Skipped (soft-deleted): ${skippedRecords.length} records`);
   
   if (failedRecords.length > 0) {
     console.log(`⚠️ Failed records details:`, failedRecords);
+  }
+  
+  if (skippedRecords.length > 0) {
+    console.log(`⏭️ Skipped records details:`, skippedRecords);
   }
   
   return savedRecords;
