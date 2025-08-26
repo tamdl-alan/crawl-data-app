@@ -31,7 +31,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit', 'delete', 'view', 'selection-change'])
+const emit = defineEmits(['edit', 'delete', 'view', 'crawl', 'selection-change'])
 
 const isModalActive = ref(false)
 const isModalDangerActive = ref(false)
@@ -180,74 +180,81 @@ watch(() => props.data, () => {
       </p>
     </CardBoxModal>
 
-    <table class="w-full">
-      <thead>
-        <tr>
-          <th v-if="checkable" />
-          <th 
-            v-for="column in columns" 
-            :key="column.key"
-            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
-            @click="handleSort(column.key)"
-          >
-            <div class="flex items-center justify-between">
-              <span>{{ column.label }}</span>
-              <BaseIcon 
-                v-if="props.sortable && getSortIcon(column.key)" 
-                :path="getSortIcon(column.key)" 
-                size="16" 
-                class="ml-1"
-              />
-            </div>
-          </th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(item, index) in itemsPaginated" :key="item.id">
-          <TableCheckboxCell 
-            v-if="checkable" 
-            @checked="checked($event, item)" 
-          />
-          <td 
-            v-for="column in columns" 
-            :key="column.key"
-            :data-label="column.label"
-          >
-            <component 
-              :is="column.component" 
-              v-if="column.component"
-              :type="item[column.key]"
-              :value="item[column.key]"
-              :item="item"
+    <div class="overflow-y-auto max-h-130">
+      <table class="w-full text-sm min-w-full">
+        <thead class="sticky top-0 bg-white dark:bg-slate-800 z-10">
+          <tr class="border-b border-gray-200 dark:border-slate-600">
+            <th v-if="checkable" class="px-3 py-2" />
+            <th 
+              v-for="column in columns" 
+              :key="column.key"
+              class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
+              :style="column.width ? { width: column.width } : {}"
+              @click="handleSort(column.key)"
+            >
+              <div class="flex items-center justify-between">
+                <span>{{ column.label }}</span>
+                <BaseIcon 
+                  v-if="props.sortable && getSortIcon(column.key)" 
+                  :path="getSortIcon(column.key)" 
+                  size="16" 
+                  class="ml-1"
+                />
+              </div>
+            </th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in itemsPaginated" :key="item.id" class="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700">
+            <TableCheckboxCell 
+              v-if="checkable" 
+              @checked="checked($event, item)" 
             />
-            <span v-else v-html="renderCell(item, column, index)"></span>
-          </td>
-          <td class="before:hidden lg:w-1 whitespace-nowrap">
-            <BaseButtons type="justify-start lg:justify-end" no-wrap>
-              <BaseButton 
-                color="info" 
-                :icon="mdiEye" 
-                small 
-                @click="handleView(item)" 
+            <td 
+              v-for="column in columns" 
+              :key="column.key"
+              :data-label="column.label"
+              class="px-3 py-2"
+              :style="column.width ? { width: column.width } : {}"
+            >
+              <component 
+                :is="column.component" 
+                v-if="column.component"
+                :type="item[column.key]"
+                :value="item[column.key]"
+                :item="item"
               />
-              <BaseButton 
-                color="warning" 
-                :icon="mdiPencil" 
-                small 
-                @click="handleEdit(item)" 
-              />
-              <BaseButton
-                color="danger"
-                :icon="mdiTrashCan"
-                small
-                @click="handleDelete(item)"
-              />
-            </BaseButtons>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <span v-else v-html="renderCell(item, column, index)"></span>
+            </td>
+            <td class="before:hidden lg:w-1 whitespace-nowrap px-3 py-2">
+              <slot name="actions" :item="item" :handle-view="handleView" :handle-edit="handleEdit" :handle-delete="handleDelete">
+                <BaseButtons type="justify-start lg:justify-end" no-wrap>
+                  <BaseButton 
+                    color="info" 
+                    :icon="mdiEye" 
+                    small 
+                    @click="handleView(item)" 
+                  />
+                  <BaseButton 
+                    color="warning" 
+                    :icon="mdiPencil" 
+                    small 
+                    @click="handleEdit(item)" 
+                  />
+                  <BaseButton
+                    color="danger"
+                    :icon="mdiTrashCan"
+                    small
+                    @click="handleDelete(item)"
+                  />
+                </BaseButtons>
+              </slot>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     
     <div v-if="numPages > 1" class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
       <BaseLevel>
