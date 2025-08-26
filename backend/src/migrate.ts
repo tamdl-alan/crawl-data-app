@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { up as createProductsTableUp, down as createProductsTableDown } from './migrations/001_create_products_table.js';
 import { up as renameColumnsUp, down as renameColumnsDown } from './migrations/002_rename_columns.js';
+import { up as createCrawledDataTableUp, down as createCrawledDataTableDown } from './migrations/003_create_crawled_data_table.js';
 
 dotenv.config();
 
@@ -14,6 +15,8 @@ async function runMigrations() {
     console.log('Running migrations...');
     await createProductsTableUp(pool);
     await renameColumnsUp(pool);
+    await createCrawledDataTableUp(pool);
+    
     console.log('Migrations completed successfully.');
   } catch (error) {
     console.error('Error running migrations:', error);
@@ -26,6 +29,7 @@ async function runMigrations() {
 async function rollbackMigrations() {
   try {
     console.log('Rolling back migrations...');
+    await createCrawledDataTableDown(pool);
     await renameColumnsDown(pool);
     await createProductsTableDown(pool);
     console.log('Rollback completed successfully.');

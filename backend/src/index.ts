@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { Pool } from "pg";
 import cors from "cors";
 import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import cron from 'node-cron';
@@ -15,7 +16,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors());
-
+(puppeteer as any).use(StealthPlugin());
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54325/crawl-data",
 });
@@ -32,36 +33,52 @@ app.get("/", async (_req, res) => {
 });
 
 // -------------Crawl Data Start------------------
-app.post("/crawl-data", async (req: ProductModel, res: any) => {
+app.post("/crawl-data", async (req: Request, res: any) => {
   if (!req) {
     res.status(400).send({ message: 'Product ID is required' });
     return;
   }
-  const { id, goat_url, goat_id, snkrdunk_api, type } = req;
+  const { id, goat_url, goat_id, snkrdunk_api, type } = req.body as unknown as ProductModel;
   try {
 
-    console.log(`------------Crawling data [${snkrdunk_api}] SNKRDUNK Start: [${new Date()}]------------`);
+    console.log(`------------Crawling data [${snkrdunk_api}] SNKRDUNK Start: [${getVietnamTime()}]------------`);
     const dataSnk = await crawlDataSnkrdunk(snkrdunk_api, type);
-    console.log(`------------Crawling data [${snkrdunk_api}] SNKRDUNK End: [${new Date()}]------------`);
+    console.log(`------------Crawling data [${snkrdunk_api}] SNKRDUNK End: [${getVietnamTime()}]------------`);
 
-    console.log(`------------Crawling data [${goat_url}] GOAT Start: [${new Date()}]------------`);
+    console.log(`------------Crawling data [${goat_url}] GOAT Start: [${getVietnamTime()}]------------`);
     const dataGoat = await extractDetailsFromProductGoat(goat_url, goat_id, type);
-    console.log(`------------Crawling data [${goat_url}] GOAT End: [${new Date()}]------------`);
+    console.log(`------------Crawling data [${goat_url}] GOAT End: [${getVietnamTime()}]------------`);
 
     const mergedArr = mergeData(dataSnk, dataGoat);
-    
+
     if (!mergedArr?.length) {
       console.warn(`⚠️ No data found for Product ID: ${goat_url}`);
       if (!res.headersSent) {
         res.status(200).send({ message: '⛔ No data found for the given Product ID' });  
       }
     } else {
-      // await pushToAirtable(mergedArr);
-      if (!res.headersSent) {
-        res.status(200).send({ message: `✅ Done crawling ${id}` });
+      try {
+        // Save data to database using crawled-data API
+        const savedRecords = await saveCrawledDataToDatabase(mergedArr);
+        console.log(`✅ Successfully saved ${savedRecords.length} records to database`);
+        if (!res.headersSent) {
+          res.status(200).send({ 
+            message: `✅ Done crawling ${goat_url}`,
+            savedRecords: savedRecords.length,
+            totalRecords: mergedArr.length,
+            completedAt: getVietnamTime()
+          });
+        }
+      } catch (dbError: any) {
+        console.error('❌ Error saving to database:', dbError.message);
+        if (!res.headersSent) {
+          res.status(500).send({ 
+            message: `❌ Error saving data to database: ${dbError.message}`,
+            crawledData: mergedArr // Return crawled data even if DB save fails
+          });
+        }
       }
     }
-    
   } catch (error: any) {
     console.error(`❌ Error crawling ${id}:`, error.message);
     if (!res.headersSent) {
@@ -119,17 +136,18 @@ function mergeData(dataSnk: any, dataGoal: any) {
   const merged = dataGoal?.map((item: any) => {
     const sizeStr = item['size_goat'];
     const priceSnk = priceMap.get(sizeStr) as number;
-    const priceGoat = parseInt(item['price_goat']);
+    const priceGoat = parseFloat(item['price_goat']) || 0;
 
-    return {
+    const mergedItem = {
       ...item,
       price_goat: priceGoat,
       price_snkrdunk: priceSnk ?? 0,
       size_snkrdunk: sizeStr,
       profit_amount: priceSnk != null ? priceGoat - priceSnk : 0,
-      date_created: new Date(),
+      selling_price: 0, // Default selling price same as GOAT price
       note: '',
     };
+    return mergedItem;
   });
   return merged || [];
 }
@@ -153,31 +171,65 @@ async function crawlDataSnkrdunk(apiUrl: string, type: string) {
 
 async function snkrdunkLogin() {
   const browser = await (puppeteer as any).launch(defaultBrowserArgs);
+  let page = null;
+  
   try {
     if (cookieHeader) {
-      return
+      return;
     }
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
-    await page.goto(LOGIN_PAGE_SNKRDUNK, { waitUntil: 'networkidle2' });
+    await page.setUserAgent(userAgent);
+    await page.goto(LOGIN_PAGE_SNKRDUNK, { 
+      waitUntil: 'networkidle2',
+      timeout: 30000 
+    });
+    
+    // Wait for form elements to be ready
+    await page.waitForSelector('input[name="email"]', { timeout: 10000 });
+    await page.waitForSelector('input[name="password"]', { timeout: 10000 });
+    
+    // Clear fields first
+    await page.evaluate(() => {
+      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
+      const passwordInput = document.querySelector('input[name="password"]') as HTMLInputElement;
+      if (emailInput) emailInput.value = '';
+      if (passwordInput) passwordInput.value = '';
+    });
     await page.type('input[name="email"]', EMAIL_SNKRDUNK, { delay: 100 });
     await page.type('input[name="password"]', PASSWORD_SNKRDUNK, { delay: 100 });
-    await page.evaluate(() => document.querySelector('form')?.submit());
+    const submitButton = await page.$('button[type="submit"], input[type="submit"]');
+    if (submitButton) {
+      await submitButton.click();
+    } else {
+      // Fallback to form submit
+      await page.evaluate(() => {
+        const form = document.querySelector('form');
+        if (form) form.submit();
+      });
+    }
     const cookies = await page.cookies();
     cookieHeader = cookies.map((c: any) => `${c.name}=${c.value}`).join('; ');
-    retryCount = 0; // Reset retry count on successful login
+    retryCount = 0;
   } catch (err: any) {
-      console.error('Snkrdunk login failed:', err?.message);
-      // Retry login if it fails
-      cookieHeader = '';
-      retryCount++;
-      if (retryCount < RETRY_LIMIT) {
-        console.log(`Retrying login (${retryCount}/${RETRY_LIMIT})...`);
-        await snkrdunkLogin();
-      }
+    console.error('❌ Snkrdunk login failed:', err?.message);
+    
+    // Retry login if it fails
+    cookieHeader = '';
+    retryCount++;
+    if (retryCount < RETRY_LIMIT) {
+      console.log(`🔄 Retrying login (${retryCount}/${RETRY_LIMIT})...`);
+      await snkrdunkLogin();
+    } else {
       throw err;
+    }
   } finally {
+    try {
+      if (page) await page.close();
       await browser.close();
+    } catch (closeError: any) {
+      console.error('❌ Error closing browser:', closeError?.message);
+    }
   }
 }
 
@@ -279,14 +331,13 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
   try {
     browserChild = await (puppeteer as any).launch(defaultBrowserArgs);
     page = await browserChild.newPage();
-    
-    // Set page timeout
     page.setDefaultTimeout(60000); // 60 seconds timeout
     
     await page.setViewport(viewPortBrowser);
     await page.setUserAgent(userAgent);
     await page.setExtraHTTPHeaders(extraHTTPHeaders);
 
+    // Set cookies
     await page.setCookie(
       { name: 'currency', value: 'JPY', domain: 'www.goat.com', path: '/', secure: true },
       { name: 'country', value: 'JP', domain: 'www.goat.com', path: '/', secure: true },
@@ -294,33 +345,49 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
 
     await page.goto(goalDomain + '/' + goatUrl, { waitUntil: 'networkidle2' });
 
-    const goatSearchResponse = await page.evaluate(async (goatUrl: string, sizeAndPriceGoatUrl: string) => {
-      const res = await fetch(`${sizeAndPriceGoatUrl}=${goatUrl}`, {
-        credentials: 'include',
-        headers: {
-          'Accept-Language':	'en-US,en;q=0.9',
-          'Accept': 'application/json',
-          'Referer': 'https://www.goat.com',
-          'Origin': 'https://www.goat.com',
-        }
-      });
-      return res.json();
-    }, goatUrl, sizeAndPriceGoatUrl);
+    const goatSearchResponse = await page.evaluate(async (goatId: string, sizeAndPriceGoatUrl: string) => {
+      const url = `${sizeAndPriceGoatUrl}=${goatId}`;
+      try {
+        const res = await fetch(url, {
+          credentials: 'include',
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'application/json',
+            'Referer': 'https://www.goat.com',
+            'Origin': 'https://www.goat.com',
+          }
+        });
+        return await res.json();
+      } catch (error) {
+        console.error('API fetch error:', error);
+      }
+    }, goatId, sizeAndPriceGoatUrl);
 
+    if (!goatSearchResponse) {
+      console.error('❌ Failed to fetch product data from API');
+      return [];
+    }
+
+    // Get page content for image extraction
     const html = await page.content();
     const $ = cheerio.load(html);
 
     let imgSrc = '';
     let imgAlt = '';
 
-    await page.waitForSelector('div.swiper-slide-active', { timeout: 60000 });
-    $('div.swiper-slide-active').each((i: any, el: any) => {
-      const img = $(el).find('img');
-      if (img && !imgSrc && !imgAlt) {
-        imgSrc = img.attr('src') || '';
-        imgAlt = img.attr('alt') || '';
-      }
-    });
+    // Wait for image selector and extract
+    try {
+      await page.waitForSelector('div.swiper-slide-active', { timeout: 30000 });
+      $('div.swiper-slide-active').each((i: any, el: any) => {
+        const img = $(el).find('img');
+        if (img && !imgSrc && !imgAlt) {
+          imgSrc = img.attr('src') || '';
+          imgAlt = img.attr('alt') || '';
+        }
+      });
+    } catch (error) {
+      console.log('⚠️ Image selector not found, continuing without image...');
+    }
 
     const dataFiltered = getSizeAndPriceGoat(goatSearchResponse, type);
     const products = dataFiltered?.map((item: any) => {
@@ -354,8 +421,8 @@ function getSizeAndPriceGoat(data: any, type: string) {
     if (item.shoeCondition === "new_no_defects" && item.stockStatus !== "not_in_stock") {
       const sizeGoat = item.sizeOption.presentation?.toString()?.trim();
       return {
-        sizeGoat: type === PRODUCT_TYPE.SHOE ? sizeGoat : convertSizeClothes(sizeGoat?.toUpperCase()),
-        priceGoat: item?.lowestPriceCents?.amount / 100 // Convert cents to yen
+        size_goat: type === PRODUCT_TYPE.SHOE ? sizeGoat : convertSizeClothes(sizeGoat?.toUpperCase()),
+        price_goat: item?.lowestPriceCents?.amount / 100 // Convert cents to yen
       };
     }
     return null;
@@ -391,6 +458,124 @@ function conditionCheckSize(sizeItem: number, nameItem: number, type: string) {
 
 
 // -------------Crawl Data End--------------------
+
+// Helper function to get current time in Vietnam timezone
+function getVietnamTime(): string {
+  const now = new Date();
+  const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // UTC+7
+  
+  const year = vietnamTime.getUTCFullYear();
+  const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(vietnamTime.getUTCDate()).padStart(2, '0');
+  const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');
+  const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// Function to save crawled data to database using internal API
+async function saveCrawledDataToDatabase(crawledData: any[]) {
+  if (!Array.isArray(crawledData) || crawledData.length === 0) {
+    console.warn('⚠️ No data to save to database');
+    return [];
+  }
+
+  console.log(`📊 Starting to save ${crawledData.length} records to database...`);
+  const savedRecords = [];
+  const failedRecords = [];
+  
+  for (let i = 0; i < crawledData.length; i++) {
+    const data = crawledData[i];
+    try {
+      // Validate required fields
+      if (!data.product_url || !data.product_name) {
+        console.warn(`⚠️ Skipping record ${i + 1}: Missing required fields (product_url or product_name)`);
+        failedRecords.push({ index: i, data, reason: 'Missing required fields' });
+        continue;
+      }
+
+      // Prepare data for database insertion
+      const dbData = {
+        product_url: data.product_url || '',
+        product_name: data.product_name || '',
+        size_goat: data.size_goat || null,
+        price_goat: data.price_goat || null,
+        size_snkrdunk: data.size_snkrdunk || null,
+        price_snkrdunk: data.price_snkrdunk || null,
+        profit_amount: data.profit_amount || null,
+        selling_price: data.selling_price || null,
+        image_url: data.image?.[0]?.url || null,
+        note: data.note || ''
+      };
+
+      console.log(`📝 Saving record ${i + 1}/${crawledData.length}: ${dbData.product_name} - Size: ${dbData.size_goat}`);
+
+      // Get current time in Vietnam timezone (UTC+7)
+      const vietnamTime = getVietnamTime();
+
+      // Check if record already exists (same product_url and size_goat)
+      const existingRecord = await pool.query(
+        `SELECT id FROM crawled_data 
+         WHERE product_url = $1 AND size_goat = $2 AND del_flag = 0`,
+        [dbData.product_url, dbData.size_goat]
+      );
+
+      let result;
+      if (existingRecord.rows.length > 0) {
+        // Update existing record
+        console.log(`🔄 Updating existing record for ${dbData.product_name} - Size: ${dbData.size_goat}`);
+        result = await pool.query(
+          `UPDATE crawled_data 
+           SET product_name = $1, price_goat = $2, size_snkrdunk = $3, 
+               price_snkrdunk = $4, profit_amount = $5, selling_price = $6, 
+               image_url = $7, note = $8, updated_at = $9
+           WHERE product_url = $10 AND size_goat = $11 AND del_flag = 0
+           RETURNING *`,
+          [
+            dbData.product_name, dbData.price_goat, dbData.size_snkrdunk,
+            dbData.price_snkrdunk, dbData.profit_amount, dbData.selling_price,
+            dbData.image_url, dbData.note, vietnamTime, dbData.product_url, dbData.size_goat
+          ]
+        );
+      } else {
+        // Insert new record
+        result = await pool.query(
+          `INSERT INTO crawled_data (
+            product_url, product_name, size_goat, price_goat, 
+            size_snkrdunk, price_snkrdunk, profit_amount, 
+            selling_price, image_url, note, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+          [
+            dbData.product_url, dbData.product_name, dbData.size_goat, dbData.price_goat,
+            dbData.size_snkrdunk, dbData.price_snkrdunk, dbData.profit_amount,
+            dbData.selling_price, dbData.image_url, dbData.note, vietnamTime, vietnamTime
+          ]
+        );
+      }
+      
+      savedRecords.push(result.rows[0]);
+      console.log(`✅ Successfully saved record ${i + 1}: ${dbData.product_name} - Size: ${dbData.size_goat}`);
+      
+    } catch (error: any) {
+      console.error(`❌ Error saving record ${i + 1}:`, error.message);
+      console.error(`❌ Failed data:`, data);
+      failedRecords.push({ index: i, data, reason: error.message });
+      // Continue with next record even if one fails
+    }
+  }
+  
+  console.log(`📊 Database save completed at ${getVietnamTime()}:`);
+  console.log(`✅ Successfully saved: ${savedRecords.length} records`);
+  console.log(`❌ Failed to save: ${failedRecords.length} records`);
+  
+  if (failedRecords.length > 0) {
+    console.log(`⚠️ Failed records details:`, failedRecords);
+  }
+  
+  return savedRecords;
+}
+
 // Product routes (old table)
 app.use('/products', createProductRoutes(pool));
 

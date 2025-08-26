@@ -9,15 +9,14 @@
     "serve": "node dist/index.js",
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",
-    "init-crawled-data": "tsx src/init-crawled-data.js",
+
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:build": "docker-compose build",
     "docker:logs": "docker-compose logs -f",
-    "docker:dev": "docker-compose --profile dev up -d",
-    "docker:prod": "docker-compose up -d",
     "docker:restart": "docker-compose restart",
     "docker:clean": "docker-compose down -v && docker system prune -f",
+    "docker:rebuild": "./rebuild.sh",
     "docker:db": "docker-compose up db",
     "docker:status": "docker-compose ps"
   },
