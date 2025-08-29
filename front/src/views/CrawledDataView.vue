@@ -7,6 +7,9 @@ import DataTable from '@/components/DataTable.vue'
 import CrawledDataForm from '@/components/CrawledDataForm.vue'
 import CardBox from '@/components/CardBox.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
+import CardBoxModal from '@/components/CardBoxModal.vue'
+import dayjs from "dayjs";
+
 // import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
 
@@ -18,6 +21,8 @@ const showForm = ref(false)
 const editingData = ref(null)
 const isEditMode = ref(false)
 const notification = ref({ show: false, message: '', type: 'info' })
+const isBulkDeleteModalActive = ref(false)
+const selectedItemsForBulkDelete = ref([])
 
 // Pagination state
 const currentPage = ref(1)
@@ -28,11 +33,13 @@ const pageSizeOptions = [10, 20, 50, 100]
 
 // Table columns configuration - matching crawled_data table schema
 const columns = [
-  { key: '#', label: '#', sortable: false },
+  { key: '#', label: '#', sortable: false, width: '60px', minWidth: '50px' },
   { 
     key: 'product_name', 
     label: 'Product Name', 
-    width: '200px',
+    width: '300px',
+    minWidth: '200px',
+    maxWidth: '400px',
     sortable: true,
     render: (value, row) => {
       if (row.product_url) {
@@ -41,36 +48,52 @@ const columns = [
       return value
     }
   },
-  { key: 'size_goat', label: 'Size Goat', sortable: true },
-  { key: 'price_goat', label: 'Price Goat', sortable: true, render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
-  { key: 'size_snkrdunk', label: 'Size Snkrdunk', sortable: true },
-  { key: 'price_snkrdunk', label: 'Price Snkrdunk', sortable: true, render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
-  { key: 'profit_amount', label: 'Profit Amount', sortable: true, render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
-  { key: 'selling_price', label: 'Selling Price', sortable: true, render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
+  { key: 'size_goat', label: 'Size', sortable: true, width: '120px', minWidth: '100px', align: 'center' },
+  { key: 'price_goat', label: 'Price Goat', sortable: true, width: '120px', minWidth: '100px', align: 'right', sortType: 'number', render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
+  // { key: 'size_snkrdunk', label: 'Size Snkrdunk', sortable: true, width: '140px', minWidth: '120px' },
+  { key: 'price_snkrdunk', label: 'Price Snkrdunk', sortable: true, width: '140px', minWidth: '120px', align: 'right', sortType: 'number', render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
+  { key: 'profit_amount', label: 'Profit Amount', sortable: true, width: '130px', minWidth: '110px', align: 'right', sortType: 'number', render: (value) => {
+    const amount = Math.round(value || 0);
+    const color = amount <= 0 ? 'text-red-500' : 'text-green-500';
+    return `<span class="${color}">¥${amount.toLocaleString()}</span>`;
+  }},
+  { key: 'selling_price', label: 'Selling Price', sortable: true, width: '130px', minWidth: '110px', align: 'right', sortType: 'number', render: (value) => `¥${Math.round(value || 0).toLocaleString()}` },
   { 
     key: 'image_url', 
     label: 'Image', 
+    align: 'center',
     sortable: false, 
+    width: '120px',
+    minWidth: '100px',
+    maxWidth: '150px',
     render: (value) => {
       if (value) {
-        return `<img src="${value}" alt="Product Image" class="w-12 h-12 object-cover rounded border" onerror="this.style.display='none'">`
+        return `<img src="${value}" alt="Product Image" class="object-cover rounded border" onerror="this.style.display='none'">`
       }
       return ''
     }
   },
-  { key: 'note', label: 'Note', sortable: false, width: '200px' },
   { 
     key: 'created_at', 
     label: 'Created', 
     sortable: true,
-    render: (value) => new Date(value).toLocaleDateString()
+    width: '200px',
+    minWidth: '200px',
+    align: 'center',
+    sortType: 'date',
+    render: (value) => dayjs(value).format("YYYY/MM/DD HH:mm:ss")
   },
   { 
     key: 'updated_at', 
     label: 'Updated', 
     sortable: true,
-    render: (value) => new Date(value).toLocaleDateString()
-  }
+    width: '200px',
+    minWidth: '200px',
+    align: 'center',
+    sortType: 'date',
+    render: (value) => dayjs(value).format("YYYY/MM/DD HH:mm:ss")
+  },
+  { key: 'note', label: 'Note', sortable: false, flexGrow: 1, minWidth: '200px', maxWidth: '400px' },
 ]
 
 // API functions
@@ -175,6 +198,31 @@ const handleEditData = (data) => {
 
 const handleDeleteData = async (data) => {
   await deleteCrawledData(data)
+}
+
+const handleBulkDelete = (selectedItems) => {
+  selectedItemsForBulkDelete.value = selectedItems
+  isBulkDeleteModalActive.value = true
+  console.log(selectedItems)
+}
+
+const confirmBulkDelete = async () => {
+  try {
+    loading.value = true
+    
+    // Delete all selected items in parallel
+    const deletePromises = selectedItemsForBulkDelete.value.map(item => deleteCrawledData(item))
+    await Promise.all(deletePromises)
+    
+    showNotification(`Successfully deleted ${selectedItemsForBulkDelete.value.length} item(s)`, 'success')
+    isBulkDeleteModalActive.value = false
+    selectedItemsForBulkDelete.value = []
+  } catch (error) {
+    console.error('Error bulk deleting items:', error)
+    showNotification('Failed to delete some items', 'danger')
+  } finally {
+    loading.value = false
+  }
 }
 
 const handleSaveData = async (data) => {
@@ -298,19 +346,16 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <div class="min-w-full" style="min-width: 1200px;">
-              <DataTable
-                :data="crawledData"
-                :columns="columns"
-                :checkable="true"
-                :sortable="true"
-                :per-page="perPage"
-                @edit="handleEditData"
-                @delete="handleDeleteData"
-              />
-            </div>
-          </div>
+          <DataTable
+            :data="crawledData"
+            :columns="columns"
+            :checkable="true"
+            :sortable="true"
+            :per-page="perPage"
+            @edit="handleEditData"
+            @delete="handleDeleteData"
+            @bulk-delete="handleBulkDelete"
+          />
           
           <!-- Custom Pagination -->
           <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-slate-600">
@@ -360,6 +405,31 @@ onMounted(() => {
       :data="editingData"
       :is-edit="isEditMode"
       @save="handleSaveData"
-    />
-  </LayoutAuthenticated>
-</template>
+      />
+
+      <!-- Bulk Delete Confirmation Modal -->
+      <CardBoxModal 
+        v-model="isBulkDeleteModalActive" 
+        title="Confirm Bulk Delete" 
+        button="danger" 
+        has-cancel
+        @confirm="confirmBulkDelete"
+      >
+        <p>Are you sure you want to delete <strong>{{ selectedItemsForBulkDelete.length }}</strong> selected item(s)?</p>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          This action cannot be undone.
+        </p>
+        <div v-if="selectedItemsForBulkDelete.length > 0" class="mt-4 max-h-40 overflow-y-auto">
+          <p class="text-sm font-semibold mb-2">Selected items:</p>
+          <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+            <li v-for="item in selectedItemsForBulkDelete.slice(0, 5)" :key="item.id" class="truncate">
+              {{ item.product_name + " [Size:" + item.size_goat + "]" }}
+            </li>
+            <li v-if="selectedItemsForBulkDelete.length > 5" class="text-gray-500">
+              ... and {{ selectedItemsForBulkDelete.length - 5 }} more
+            </li>
+          </ul>
+        </div>
+      </CardBoxModal>
+    </LayoutAuthenticated>
+  </template>

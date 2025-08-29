@@ -180,7 +180,7 @@ function mergeData(dataSnk: any, dataGoal: any) {
       price_goat: priceGoat,
       price_snkrdunk: priceSnk ?? 0,
       size_snkrdunk: sizeStr,
-      profit_amount: priceSnk != null ? priceGoat - priceSnk : 0,
+      profit_amount: priceSnk ? ((priceGoat * 0.76) - 1500) - (priceSnk * 1.1) : 0,
       selling_price: 0, // Default selling price same as GOAT price
       note: '',
     };
@@ -647,10 +647,6 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
   
   if (failedRecords.length > 0) {
     console.log(`⚠️ Failed records details:`, failedRecords);
-  }
-  
-  if (skippedRecords.length > 0) {
-    console.log(`⏭️ Skipped records details:`, skippedRecords);
   }
   
   return savedRecords;

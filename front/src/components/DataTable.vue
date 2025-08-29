@@ -31,12 +31,16 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit', 'delete', 'view', 'crawl', 'selection-change'])
+const emit = defineEmits(['edit', 'delete', 'view', 'crawl', 'selection-change', 'bulk-delete'])
 
 const isModalActive = ref(false)
 const isModalDangerActive = ref(false)
+const isCheckAllModalActive = ref(false)
+
+
 const currentPage = ref(0)
 const checkedRows = ref([])
+const isAllChecked = ref(false)
 const sortField = ref('')
 const sortDirection = ref('asc')
 const selectedItem = ref(null)
@@ -50,12 +54,41 @@ const itemsPaginated = computed(() => {
       const aVal = a[sortField.value]
       const bVal = b[sortField.value]
       
+      // Get column configuration for sorting
+      const column = props.columns.find(col => col.key === sortField.value)
+      
+      // Handle number sorting for price columns
+      if (column && column.sortType === 'number') {
+        const aNum = parseFloat(aVal) || 0
+        const bNum = parseFloat(bVal) || 0
+        
+        if (sortDirection.value === 'asc') {
+          return aNum - bNum
+        } else {
+          return bNum - aNum
+        }
+      }
+      
+      // Handle date sorting
+      if (column && column.sortType === 'date') {
+        const aDate = new Date(aVal || 0)
+        const bDate = new Date(bVal || 0)
+        
+        if (sortDirection.value === 'asc') {
+          return aDate - bDate
+        } else {
+          return bDate - aDate
+        }
+      }
+      
+      // Default string sorting
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         return sortDirection.value === 'asc' 
           ? aVal.localeCompare(bVal)
           : bVal.localeCompare(aVal)
       }
       
+      // Fallback for mixed types
       if (sortDirection.value === 'asc') {
         return aVal > bVal ? 1 : -1
       } else {
@@ -94,11 +127,71 @@ const remove = (arr, cb) => {
 
 const checked = (isChecked, item) => {
   if (isChecked) {
-    checkedRows.value.push(item)
+    // Add item if not already in checked rows
+    if (!checkedRows.value.some(checkedItem => checkedItem.id === item.id)) {
+      checkedRows.value.push(item)
+    }
   } else {
+    // Remove item from checked rows
     checkedRows.value = remove(checkedRows.value, (row) => row.id === item.id)
   }
+  updateAllCheckedState()
   emit('selection-change', checkedRows.value)
+}
+
+const checkAll = (isChecked) => {
+  if (isChecked) {
+    // Show confirmation modal for check all (both checked and indeterminate states)
+    isCheckAllModalActive.value = true
+  } else {
+    // Remove all current page items from checked rows
+    checkedRows.value = checkedRows.value.filter(item => 
+      !itemsPaginated.value.some(pageItem => pageItem.id === item.id)
+    )
+    updateAllCheckedState()
+    emit('selection-change', checkedRows.value)
+  }
+}
+
+const confirmCheckAll = () => {
+  // Add all current page items to checked rows
+  const currentPageItems = itemsPaginated.value.filter(item => 
+    !checkedRows.value.some(checkedItem => checkedItem.id === item.id)
+  )
+  checkedRows.value = [...checkedRows.value, ...currentPageItems]
+  updateAllCheckedState()
+  emit('selection-change', checkedRows.value)
+  isCheckAllModalActive.value = false
+}
+
+const updateAllCheckedState = () => {
+  if (itemsPaginated.value.length === 0) {
+    isAllChecked.value = false
+    return
+  }
+  
+  const checkedCount = itemsPaginated.value.filter(item => 
+    checkedRows.value.some(checkedItem => checkedItem.id === item.id)
+  ).length
+  
+  // All items checked
+  if (checkedCount === itemsPaginated.value.length) {
+    isAllChecked.value = true
+  }
+  // No items checked
+  else if (checkedCount === 0) {
+    isAllChecked.value = false
+  }
+  // Some items checked - set to indeterminate state
+  else {
+    isAllChecked.value = 'indeterminate'
+  }
+}
+
+const handleBulkDelete = () => {
+  if (checkedRows.value.length > 0) {
+    emit('bulk-delete', checkedRows.value)
+  }
 }
 
 const handleSort = (field) => {
@@ -151,14 +244,102 @@ const renderCell = (item, column, index) => {
   return item[column.key]
 }
 
+// Helper function to get column styles
+const getColumnStyles = (column) => {
+  const styles = {}
+  
+  // Handle width
+  if (column.width) {
+    if (typeof column.width === 'string') {
+      styles.width = column.width
+    } else if (typeof column.width === 'number') {
+      styles.width = `${column.width}px`
+    }
+  }
+  
+  // Handle min-width
+  if (column.minWidth) {
+    if (typeof column.minWidth === 'string') {
+      styles.minWidth = column.minWidth
+    } else if (typeof column.minWidth === 'number') {
+      styles.minWidth = `${column.minWidth}px`
+    }
+  }
+  
+  // Handle max-width
+  if (column.maxWidth) {
+    if (typeof column.maxWidth === 'string') {
+      styles.maxWidth = column.maxWidth
+    } else if (typeof column.maxWidth === 'number') {
+      styles.maxWidth = `${column.maxWidth}px`
+    }
+  }
+  
+  // Handle flex properties
+  if (column.flex) {
+    styles.flex = column.flex
+  }
+  
+  if (column.flexGrow) {
+    styles.flexGrow = column.flexGrow
+  }
+  
+  if (column.flexShrink) {
+    styles.flexShrink = column.flexShrink
+  }
+  
+  return styles
+}
+
+// Helper function to get column alignment classes
+const getColumnAlignment = (column) => {
+  const align = column.align || 'left'
+  
+  switch (align) {
+    case 'center':
+      return 'text-center'
+    case 'right':
+      return 'text-right'
+    case 'left':
+    default:
+      return 'text-left'
+  }
+}
+
 // Watch for data changes to reset pagination
 watch(() => props.data, () => {
   currentPage.value = 0
+  updateAllCheckedState()
 }, { deep: true })
+
+// Watch for pagination changes to update checked state
+watch(() => currentPage.value, () => {
+  updateAllCheckedState()
+})
 </script>
 
 <template>
   <div>
+    <!-- Check All Confirmation Modal -->
+    <CardBoxModal 
+      v-model="isCheckAllModalActive" 
+      title="Confirm Check All" 
+      button="info" 
+      has-cancel
+      @confirm="confirmCheckAll"
+    >
+      <p>Are you sure you want to select all <strong>{{ itemsPaginated.length }}</strong> items on this page?</p>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+        This will add all current page items to your selection.
+      </p>
+      <div v-if="checkedRows.length > 0" class="mt-4 p-3 bg-blue-50 dark:bg-slate-700 rounded-lg">
+        <p class="text-sm font-semibold mb-2 text-blue-700 dark:text-blue-300">Current selection:</p>
+        <p class="text-sm text-blue-600 dark:text-blue-400">
+          You already have <strong>{{ checkedRows.length }}</strong> item(s) selected from other pages.
+        </p>
+      </div>
+    </CardBoxModal>
+
     <CardBoxModal v-model="isModalActive" title="Item Details">
       <div v-if="selectedItem">
         <div v-for="column in columns" :key="column.key" class="mb-3">
@@ -180,20 +361,50 @@ watch(() => props.data, () => {
       </p>
     </CardBoxModal>
 
-    <div class="overflow-y-auto max-h-130">
-      <table class="w-full text-sm min-w-full">
+      <!-- Bulk Actions -->
+      <div class="p-3 bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm text-gray-600 dark:text-gray-400">
+              {{ checkedRows.length }} item(s) selected
+            </span>
+            <span v-if="checkedRows.length > itemsPaginated.length" class="text-xs text-gray-500 dark:text-gray-400">
+              (across {{ Math.ceil(checkedRows.length / itemsPaginated.length) }} pages)
+            </span>
+          </div>
+          <BaseButton
+            color="danger"
+            label="Delete Selected"
+            small
+            :disabled="checkedRows.length === 0"
+            @click="handleBulkDelete"
+          />
+        </div>
+      </div>
+
+      <div class="table-container">
+      <div class="overflow-y-auto max-h-130">
+        <table class="w-full text-sm min-w-full">
         <thead class="sticky top-0 bg-white dark:bg-slate-800 z-10">
-          <tr class="border-b border-gray-200 dark:border-slate-600">
-            <th v-if="checkable" class="px-3 py-2" />
+            <tr class="border-b border-gray-200 dark:border-slate-600">
+              <th v-if="checkable" class="pr-3 py-2">
+                <TableCheckboxCell 
+                  :checked="isAllChecked"
+                  @checked="checkAll"
+                />
+              </th>
             <th 
               v-for="column in columns" 
               :key="column.key"
-              class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700"
-              :style="column.width ? { width: column.width } : {}"
+              :class="[
+                'px-3 py-2 font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700',
+                getColumnAlignment(column)
+              ]"
+              :style="getColumnStyles(column)"
               @click="handleSort(column.key)"
             >
               <div class="flex items-center justify-between">
-                <span>{{ column.label }}</span>
+                <span class="text-center">{{ column.label }}</span>
                 <BaseIcon 
                   v-if="props.sortable && getSortIcon(column.key)" 
                   :path="getSortIcon(column.key)" 
@@ -209,14 +420,18 @@ watch(() => props.data, () => {
           <tr v-for="(item, index) in itemsPaginated" :key="item.id" class="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700">
             <TableCheckboxCell 
               v-if="checkable" 
+              :checked="checkedRows.some(checkedItem => checkedItem.id === item.id)"
               @checked="checked($event, item)" 
             />
             <td 
               v-for="column in columns" 
               :key="column.key"
               :data-label="column.label"
-              class="px-3 py-2"
-              :style="column.width ? { width: column.width } : {}"
+              :class="[
+                'px-3 py-2',
+                getColumnAlignment(column)
+              ]"
+              :style="getColumnStyles(column)"
             >
               <component 
                 :is="column.component" 
@@ -254,6 +469,7 @@ watch(() => props.data, () => {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
     
     <div v-if="numPages > 1" class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">

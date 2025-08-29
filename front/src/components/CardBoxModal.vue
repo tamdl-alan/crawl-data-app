@@ -73,9 +73,9 @@ window.addEventListener('keydown', (e) => {
       </div>
 
       <template #footer>
-        <BaseButtons>
-          <BaseButton :label="buttonLabel" :color="button" @click="confirm" />
+        <BaseButtons type="justify-end" >
           <BaseButton v-if="hasCancel" label="Cancel" :color="button" outline @click="cancel" />
+          <BaseButton :label="buttonLabel" :color="button" @click="confirm" />
         </BaseButtons>
       </template>
     </CardBox>

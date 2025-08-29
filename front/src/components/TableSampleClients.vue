@@ -67,6 +67,7 @@ const checked = (isChecked, client) => {
 </script>
 
 <template>
+  <div>
   <CardBoxModal v-model="isModalActive" title="Sample modal">
     <p>Lorem ipsum dolor sit amet <b>adipiscing elit</b></p>
     <p>This is sample modal</p>
@@ -77,7 +78,8 @@ const checked = (isChecked, client) => {
     <p>This is sample modal</p>
   </CardBoxModal>
 
-  <table>
+  <div class="table-container">
+    <table>
     <thead>
       <tr>
         <th v-if="checkable" />
@@ -129,6 +131,7 @@ const checked = (isChecked, client) => {
       </tr>
     </tbody>
   </table>
+  </div>
   <div class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
     <BaseLevel>
       <BaseButtons>
@@ -144,5 +147,6 @@ const checked = (isChecked, client) => {
       </BaseButtons>
       <small>Page {{ currentPageHuman }} of {{ numPages }}</small>
     </BaseLevel>
+  </div>
   </div>
 </template>

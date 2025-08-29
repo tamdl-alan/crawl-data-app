@@ -245,7 +245,7 @@ watch(() => props.data, (newData) => {
       </template>
 
       <!-- Always show Selling Price and Note for editing -->
-      <FormField label="Selling Price ($)" :error="errors.selling_price">
+      <FormField label="Selling Price (¥)" :error="errors.selling_price">
         <FormControl
           v-model="form.selling_price"
           :icon="null"

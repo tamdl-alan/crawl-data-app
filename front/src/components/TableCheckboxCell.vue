@@ -1,26 +1,68 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 
-defineProps({
+const props = defineProps({
   type: {
     type: String,
     default: 'td',
+  },
+  checked: {
+    type: [Boolean, String],
+    default: false,
   },
 })
 
 const emit = defineEmits(['checked'])
 
-const checked = ref(false)
+const isChecked = ref(false)
+const isIndeterminate = ref(false)
+const checkboxRef = ref(null)
 
-watch(checked, (newVal) => {
-  emit('checked', newVal)
+// Watch for external changes to checked prop
+watch(() => props.checked, async (newVal) => {
+  if (newVal === 'indeterminate') {
+    isIndeterminate.value = true
+    isChecked.value = false
+  } else {
+    isIndeterminate.value = false
+    isChecked.value = Boolean(newVal)
+  }
+  
+  // Use nextTick to ensure DOM is updated before setting indeterminate
+  await nextTick()
+  if (checkboxRef.value) {
+    checkboxRef.value.indeterminate = isIndeterminate.value
+  }
+}, { immediate: true })
+
+// Watch for internal changes
+watch(isChecked, (newVal) => {
+  if (!isIndeterminate.value) {
+    emit('checked', newVal)
+  }
 })
+
+const handleClick = () => {
+  if (isIndeterminate.value) {
+    // If indeterminate, clicking should check all (will trigger modal in parent)
+    emit('checked', true)
+  } else {
+    // Normal toggle behavior
+    isChecked.value = !isChecked.value
+    emit('checked', isChecked.value)
+  }
+}
 </script>
 
 <template>
-  <component :is="type" class="lg:w-1">
+  <component :is="type" class="lg:w-1 text-center">
     <label class="checkbox">
-      <input v-model="checked" type="checkbox" />
+      <input 
+        ref="checkboxRef"
+        :checked="isChecked" 
+        type="checkbox" 
+        @click="handleClick"
+      />
       <span class="check" />
     </label>
   </component>
