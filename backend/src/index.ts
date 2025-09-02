@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(cors());
 (puppeteer as any).use(StealthPlugin());
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54325/crawl-data",
+  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54321/crawl-data",
 });
 
 // Test API endpoint
@@ -45,6 +45,200 @@ app.get("/memory", (_req, res) => {
     uptime: `${(process.uptime() / 60).toFixed(2)} minutes`,
     timestamp: getVietnamTime()
   });
+});
+
+// -------------Crawl All Data Start------------------
+app.post("/crawl-all", async (req: Request, res: any) => {
+  const memBefore = process.memoryUsage();
+  logMemoryUsage(`Before crawling all data`, memBefore);
+  
+  try {
+    console.log(`🚀 Starting optimized bulk crawl operation at ${getVietnamTime()}`);
+    
+    // Get all products that need crawling
+    const productsResult = await pool.query(`
+      SELECT id, goat_url, goat_id, snkrdunk_api, type 
+      FROM products 
+      ORDER BY id ASC
+    `);
+    
+    const products = productsResult.rows;
+    console.log(`📋 Found ${products.length} products to crawl (limited to 10 for testing)`);
+    
+    if (products.length === 0) {
+      return res.status(200).json({ 
+        message: 'No active products found to crawl',
+        totalProducts: 0,
+        completedAt: getVietnamTime()
+      });
+    }
+    
+    const results: any[] = [];
+    let successCount = 0;
+    let errorCount = 0;
+    
+    // Initialize shared browser instance for optimization
+    let browser: any = null;
+    let page: any = null;
+    
+    try {
+      // Create single browser instance for all crawling
+      browser = await (puppeteer as any).launch({
+        ...defaultBrowserArgs,
+        headless: 'true'
+      });
+      
+      // Create single page instance
+      page = await browser.newPage();
+      await page.setUserAgent(userAgent);
+      await page.setViewport(viewPortBrowser);
+      await page.setExtraHTTPHeaders(extraHTTPHeaders);
+      
+      // Step 1: Login to SNKRDUNK once for all operations
+      console.log(`🔐 Step 1: Logging into SNKRDUNK...`);
+      await snkrdunkLogin();
+      console.log(`✅ SNKRDUNK login successful`);
+      
+      // Step 2: Crawl all SNKRDUNK data first and store in map
+      console.log(`📊 Step 2: Crawling all SNKRDUNK data...`);
+      const snkrdunkDataMap = new Map();
+      
+      for (const product of products) {
+        try {
+          const { id, snkrdunk_api, type } = product;
+          console.log(`🔄 Crawling SNKRDUNK data for product ${id}: ${snkrdunk_api}`);
+          
+          const dataSnk = await crawlDataSnkrdunk(snkrdunk_api || '', type || 'SHOE');
+          snkrdunkDataMap.set(id, dataSnk);
+          
+          console.log(`✅ SNKRDUNK data for product ${id}: ${dataSnk?.length || 0} records`);
+          
+          // Small delay between SNKRDUNK requests
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error: any) {
+          console.error(`❌ Error crawling SNKRDUNK data for product ${product.id}:`, error.message);
+          snkrdunkDataMap.set(product.id, []); // Set empty array for failed products
+        }
+      }
+      
+      console.log(`✅ Completed SNKRDUNK crawling for all ${products.length} products`);
+      
+      // Step 3: Crawl all GOAT data and merge with SNKRDUNK data
+      console.log(`🛍️ Step 3: Crawling all GOAT data...`);
+      
+      for (const product of products) {
+        try {
+          const { id, goat_url, goat_id, type } = product;
+          console.log(`🔄 Crawling GOAT data for product ${id}: ${goat_url}`);
+          
+          // Get SNKRDUNK data from map
+          const dataSnk = snkrdunkDataMap.get(id) || [];
+          
+          // Crawl GOAT data using shared page (optimized)
+          const dataGoat = await extractDetailsFromProductGoatWithPage(page, goat_url || '', goat_id || '', type || 'SHOE');
+          
+          // Merge data
+          const mergedArr = mergeData(dataSnk, dataGoat);
+          
+          if (mergedArr?.length) {
+            const savedRecords = await saveCrawledDataToDatabase(mergedArr);
+            successCount++;
+            results.push({
+              productId: id,
+              goatUrl: goat_url,
+              status: 'success',
+              savedRecords: savedRecords.length,
+              totalRecords: mergedArr.length,
+              snkrdunkRecords: dataSnk.length,
+              goatRecords: dataGoat.length,
+              message: 'Success'
+            });
+            console.log(`✅ Product ${id}: Saved ${savedRecords.length}/${mergedArr.length} records (SNK: ${dataSnk.length}, GOAT: ${dataGoat.length})`);
+          } else {
+            errorCount++;
+            results.push({
+              productId: id,
+              goatUrl: goat_url,
+              status: 'error',
+              error: 'No data found after merge',
+              snkrdunkRecords: dataSnk.length,
+              goatRecords: dataGoat.length
+            });
+            console.log(`⚠️ Product ${id}: No data found after merge (SNK: ${dataSnk.length}, GOAT: ${dataGoat.length})`);
+          }
+          
+          // Optimize memory and cleanup after each product
+          await optimizeMemoryAndCleanup(page);
+          
+          // Small delay between GOAT requests
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+        } catch (error: any) {
+          errorCount++;
+          results.push({
+            productId: product.id,
+            goatUrl: product.goat_url,
+            status: 'error',
+            error: error.message
+          });
+          console.error(`❌ Error processing product ${product.id}:`, error.message);
+        }
+      }
+      
+      console.log(`✅ Completed GOAT crawling and data merging for all ${products.length} products`);
+      
+    } finally {
+      // Cleanup browser resources
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {
+          console.error('Error closing page:', e);
+        }
+      }
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (e) {
+          console.error('Error closing browser:', e);
+        }
+      }
+    }
+    
+    const summary = {
+      totalProducts: products.length,
+      successCount,
+      errorCount,
+      successRate: ((successCount / products.length) * 100).toFixed(2) + '%',
+      results,
+      completedAt: getVietnamTime()
+    };
+    
+    console.log(`✅ Optimized bulk crawl completed: ${successCount}/${products.length} successful`);
+    
+    res.status(200).json({
+      message: `Optimized bulk crawl completed successfully`,
+      ...summary
+    });
+    
+  } catch (error: any) {
+    console.error(`❌ Error in optimized bulk crawl:`, error.message);
+    res.status(500).json({ 
+      message: `Optimized bulk crawl failed: ${error.message}`,
+      completedAt: getVietnamTime()
+    });
+  } finally {
+    // Log memory usage after crawling
+    const memAfter = process.memoryUsage();
+    logMemoryUsage(`After optimized crawling all data`, memAfter);
+    logMemoryChanges(`Optimized Bulk Crawl`, memBefore, memAfter);
+    
+    // Force garbage collection
+    if (global.gc) {
+      global.gc();
+    }
+  }
 });
 
 // -------------Crawl Data Start------------------
@@ -126,7 +320,6 @@ app.post("/crawl-data", async (req: Request, res: any) => {
 
 
 // ========== Common Start ========== //
-const PORT = process.env.PORT || 3000;
 
 const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 const viewPortBrowser = { width: 1920, height: 1200 };
@@ -168,6 +361,129 @@ const goalDomain = 'https://www.goat.com';
 const sizeAndPriceGoatUrl = 'https://www.goat.com/web-api/v1/product_variants/buy_bar_data?productTemplateId'
 // ========== Goal End ========== //
 
+
+
+// Helper function to extract GOAT data with shared page (optimized)
+async function extractDetailsFromProductGoatWithPage(page: any, goatUrl: string, goatId: string, type: string) {
+  try {
+    // Navigate to GOAT product page
+    await page.goto(goalDomain + '/' + goatUrl, { waitUntil: 'networkidle2' });
+
+    // Call GOAT API using the same page instance
+    const goatSearchResponse = await page.evaluate(async (goatId: string, sizeAndPriceGoatUrl: string) => {
+      const url = `${sizeAndPriceGoatUrl}=${goatId}`;
+      try {
+        const res = await fetch(url, {
+          credentials: 'include',
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'application/json',
+            'Referer': 'https://www.goat.com',
+            'Origin': 'https://www.goat.com',
+          }
+        });
+        return await res.json();
+      } catch (error) {
+        console.error('API fetch error:', error);
+        return null;
+      }
+    }, goatId, sizeAndPriceGoatUrl);
+
+    if (!goatSearchResponse) {
+      console.error('❌ Failed to fetch product data from API');
+      return [];
+    }
+
+    // Get page content for image extraction
+    const html = await page.content();
+    const $ = cheerio.load(html);
+
+    let imgSrc = '';
+    let imgAlt = '';
+
+    // Wait for image selector and extract
+    try {
+      await page.waitForSelector('div.swiper-slide-active', { timeout: 30000 });
+      $('div.swiper-slide-active').each((i: any, el: any) => {
+        const img = $(el).find('img');
+        if (img && !imgSrc && !imgAlt) {
+          imgSrc = img.attr('src') || '';
+          imgAlt = img.attr('alt') || '';
+        }
+      });
+    } catch (error) {
+      console.log('⚠️ Image selector not found, continuing without image...');
+    }
+
+    const dataFiltered = getSizeAndPriceGoat(goatSearchResponse, type);
+    const products = dataFiltered?.map((item: any) => {
+      return {
+        product_url: goatUrl,
+        product_name: imgAlt,
+        image: [{ url: imgSrc }],
+        size_goat: item['size_goat'],
+        price_goat: item['price_goat']
+      }
+    });
+
+    console.log(`✅ Extracted Goat data with shared page!!!`);
+    return products || [];
+    
+  } catch (error: any) {
+    console.error('❌ Error extracting GOAT data with shared page:', error.message);
+    return [];
+  }
+}
+
+// Helper function to optimize memory and browser cleanup
+async function optimizeMemoryAndCleanup(page: any) {
+  try {
+    // Clear page cache and memory
+    await page.evaluate(() => {
+      // Clear browser cache
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => {
+            caches.delete(name);
+          });
+        });
+      }
+      
+      // Clear localStorage and sessionStorage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear any global variables that might be stored
+      if ((window as any).__INITIAL_STATE__) {
+        delete (window as any).__INITIAL_STATE__;
+      }
+      
+      // Clear any other potential memory leaks
+      if ((window as any).__REDUX_DEVTOOLS_EXTENSION__) {
+        delete (window as any).__REDUX_DEVTOOLS_EXTENSION__;
+      }
+      
+      // Clear any stored data in memory
+      if ((window as any).productData) {
+        delete (window as any).productData;
+      }
+    });
+    
+    // Clear page cookies and cache
+    await page.setCacheEnabled(false);
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+    
+    console.log('🧹 Memory cleanup completed');
+    
+  } catch (cleanupError) {
+    console.warn('⚠️ Memory cleanup warning:', cleanupError);
+  }
+}
+
 function mergeData(dataSnk: any, dataGoal: any) {
   const priceMap = new Map(dataSnk?.map((p: any) => [String(p['sizeSnkrdunk']), p['priceSnkrdunk']]));
   const merged = dataGoal?.map((item: any) => {
@@ -188,9 +504,6 @@ function mergeData(dataSnk: any, dataGoal: any) {
   });
   return merged || [];
 }
-
-
-
 
 async function crawlDataSnkrdunk(apiUrl: string, type: string) {
   try {
@@ -459,7 +772,7 @@ function getSizeAndPriceGoat(data: any, type: string) {
       const sizeGoat = item.sizeOption.presentation?.toString()?.trim();
       return {
         size_goat: type === PRODUCT_TYPE.SHOE ? sizeGoat : convertSizeClothes(sizeGoat?.toUpperCase()),
-        price_goat: item?.lowestPriceCents?.amount / 100 // Convert cents to yen
+        price_goat: item?.lowestPriceCents?.amount // Already in JPY
       };
     }
     return null;
@@ -486,14 +799,6 @@ function conditionCheckSize(sizeItem: number, nameItem: number, type: string) {
   }
   return false;
 }
-
-
-
-
-
-
-
-
 // -------------Crawl Data End--------------------
 
 // Helper function to get current time in Vietnam timezone
@@ -556,7 +861,7 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
     const data = crawledData[i];
     try {
       // Validate required fields
-      if (!data.product_url || !data.product_name) {
+      if (!data.product_url) {
         console.warn(`⚠️ Skipping record ${i + 1}: Missing required fields (product_url or product_name)`);
         failedRecords.push({ index: i, data, reason: 'Missing required fields' });
         continue;
@@ -601,15 +906,14 @@ async function saveCrawledDataToDatabase(crawledData: any[]) {
         console.log(`🔄 Updating existing record for ${dbData.product_name} - Size: ${dbData.size_goat}`);
         result = await pool.query(
           `UPDATE crawled_data 
-           SET product_name = $1, price_goat = $2, size_snkrdunk = $3, 
-               price_snkrdunk = $4, profit_amount = $5, selling_price = $6, 
-               image_url = $7, note = $8, updated_at = $9
-           WHERE product_url = $10 AND size_goat = $11 AND del_flag = 0
+           SET price_goat = $1, size_snkrdunk = $2, 
+               price_snkrdunk = $3, profit_amount = $4, updated_at = $5
+           WHERE product_url = $6 AND size_goat = $7 AND del_flag = 0
            RETURNING *`,
           [
-            dbData.product_name, dbData.price_goat, dbData.size_snkrdunk,
-            dbData.price_snkrdunk, dbData.profit_amount, dbData.selling_price,
-            dbData.image_url, dbData.note, vietnamTime, dbData.product_url, dbData.size_goat
+            dbData.price_goat, dbData.size_snkrdunk,
+            dbData.price_snkrdunk, dbData.profit_amount, vietnamTime, 
+            dbData.product_url, dbData.size_goat
           ]
         );
       } else {
@@ -657,6 +961,58 @@ app.use('/products', createProductRoutes(pool));
 
 // Crawled data routes (new table)
 app.use('/crawled-data', createCrawledDataRoutes(pool));
+
+// ========== Cron Jobs Start ========== //
+// Cron job to run crawl-all every hour
+cron.schedule(process.env.CRON_JOB_TIME || '0 * * * *', async () => {
+  console.log(`🕐 Cron job started at ${getVietnamTime()}`);
+  
+  const memBefore = process.memoryUsage();
+  try {
+    logMemoryUsage(`Before cron crawl-all`, memBefore);
+    
+    // Get server URL from environment variable
+    const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const crawlAllUrl = `${serverUrl}/crawl-all`;
+    
+    console.log(`🌐 Cron: Calling crawl-all API at: ${crawlAllUrl}`);
+    
+    // Call the existing crawl-all API internally
+    const crawlAllResponse = await fetch(crawlAllUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const result = await crawlAllResponse.json();
+    
+    if (crawlAllResponse.ok) {
+      console.log(`✅ Cron: Successfully triggered crawl-all`);
+      console.log(`📊 Cron: Summary:`, result);
+    } else {
+      console.error(`❌ Cron: crawl-all failed:`, result.message);
+    }
+    
+  } catch (error: any) {
+    console.error(`❌ Cron: Error calling crawl-all:`, error.message);
+  } finally {
+    // Log memory usage after crawling
+    const memAfter = process.memoryUsage();
+    logMemoryUsage(`After cron crawl-all`, memAfter);
+    logMemoryChanges(`Cron Bulk Crawl`, memBefore, memAfter);
+    
+    // Force garbage collection
+    if (global.gc) {
+      global.gc();
+    }
+    
+    console.log(`🕐 Cron job completed at ${getVietnamTime()}`);
+  }
+}, {
+  timezone: "Asia/Ho_Chi_Minh"
+});
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`🚀 Server running on port ${port}`));

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: crawl-db
+    environment:
+      POSTGRES_DB: crawl-data
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin-crawl
+    ports:
+      - "54321:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crawl-network
+
+  # Backend API
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crawl-backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - SERVER_URL=http://localhost:3000
+      - DATABASE_URL=postgresql://postgres:admin-crawl@db:5432/crawl-data
+      - EMAIL_SNKRDUNK=cathoiloi1135@gmail.com
+      - PASSWORD_SNKRDUNK=Sy123456
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
+      - TZ=Asia/Ho_Chi_Minh
+      - NODE_OPTIONS=--max-old-space-size=4096
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - crawl-network
+
+  # Frontend (Vue.js + Nginx)
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: crawl-frontend
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - crawl-network
+
+volumes:
+  postgres_data:
+
+networks:
+  crawl-network:
+    driver: bridge

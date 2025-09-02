@@ -28,6 +28,10 @@ const props = defineProps({
   perPage: {
     type: Number,
     default: 10
+  },
+  tableHeight: {
+    type: String,
+    default: 'auto'
   }
 })
 
@@ -142,7 +146,7 @@ const checked = (isChecked, item) => {
 const checkAll = (isChecked) => {
   if (isChecked) {
     // Show confirmation modal for check all (both checked and indeterminate states)
-    isCheckAllModalActive.value = true
+    // isCheckAllModalActive.value = true
   } else {
     // Remove all current page items from checked rows
     checkedRows.value = checkedRows.value.filter(item => 
@@ -382,12 +386,12 @@ watch(() => currentPage.value, () => {
         </div>
       </div>
 
-      <div class="table-container">
-      <div class="overflow-y-auto max-h-130">
+      <div class="table-container compact">
+      <div class="overflow-y-auto" :style="{ maxHeight: tableHeight }">
         <table class="w-full text-sm min-w-full">
         <thead class="sticky top-0 bg-white dark:bg-slate-800 z-10">
             <tr class="border-b border-gray-200 dark:border-slate-600">
-              <th v-if="checkable" class="pr-3 py-2">
+              <th v-if="checkable" class="pr-3 py-1">
                 <TableCheckboxCell 
                   :checked="isAllChecked"
                   @checked="checkAll"
@@ -396,10 +400,10 @@ watch(() => currentPage.value, () => {
             <th 
               v-for="column in columns" 
               :key="column.key"
-              :class="[
-                'px-3 py-2 font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700',
-                getColumnAlignment(column)
-              ]"
+                              :class="[
+                  'px-3 py-1 font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700',
+                  getColumnAlignment(column)
+                ]"
               :style="getColumnStyles(column)"
               @click="handleSort(column.key)"
             >
@@ -427,10 +431,10 @@ watch(() => currentPage.value, () => {
               v-for="column in columns" 
               :key="column.key"
               :data-label="column.label"
-              :class="[
-                'px-3 py-2',
-                getColumnAlignment(column)
-              ]"
+                              :class="[
+                  'px-3 py-1',
+                  getColumnAlignment(column)
+                ]"
               :style="getColumnStyles(column)"
             >
               <component 
@@ -442,7 +446,7 @@ watch(() => currentPage.value, () => {
               />
               <span v-else v-html="renderCell(item, column, index)"></span>
             </td>
-            <td class="before:hidden lg:w-1 whitespace-nowrap px-3 py-2">
+                            <td class="before:hidden lg:w-1 whitespace-nowrap px-3 py-1">
               <slot name="actions" :item="item" :handle-view="handleView" :handle-edit="handleEdit" :handle-delete="handleDelete">
                 <BaseButtons type="justify-start lg:justify-end" no-wrap>
                   <BaseButton 

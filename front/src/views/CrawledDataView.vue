@@ -43,7 +43,7 @@ const columns = [
     sortable: true,
     render: (value, row) => {
       if (row.product_url) {
-        return `<a href="${row.product_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">${value}</a>`
+        return `<a href="https://www.goat.com/${row.product_url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">${value}</a>`
       }
       return value
     }
@@ -63,9 +63,9 @@ const columns = [
     label: 'Image', 
     align: 'center',
     sortable: false, 
-    width: '120px',
-    minWidth: '100px',
-    maxWidth: '150px',
+    width: '80px',
+    minWidth: '80px',
+    maxWidth: '80px',
     render: (value) => {
       if (value) {
         return `<img src="${value}" alt="Product Image" class="object-cover rounded border" onerror="this.style.display='none'">`
@@ -314,7 +314,10 @@ onMounted(() => {
           <div class="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-600 pb-4 mb-4">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <h3 class="text-lg font-semibold">Crawled Data List</h3>
+                <div class="flex flex-col gap-2">
+                  <h3 class="text-lg font-semibold">Crawled Data List</h3>
+                  <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 24% - 1500) - (Price snkrdunk + 10%)</p>
+                </div>
                 <div class="flex items-center gap-2">
                   <span class="text-sm text-gray-600 dark:text-gray-400">Show:</span>
                   <div class="relative">
@@ -352,6 +355,7 @@ onMounted(() => {
             :checkable="true"
             :sortable="true"
             :per-page="perPage"
+            :table-height="'430px'"
             @edit="handleEditData"
             @delete="handleDeleteData"
             @bulk-delete="handleBulkDelete"
