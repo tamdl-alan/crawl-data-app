@@ -23,3 +23,5 @@ coverage/
 .cache/
 .tmp/
 temp/
+railway-deploy.md
+railway-docker-compose.yml

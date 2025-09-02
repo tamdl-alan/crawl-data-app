@@ -34,14 +34,14 @@ RUN wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrom
 # Tạo thư mục app
 WORKDIR /app
 
-# Copy package files trước để tận dụng Docker cache
-COPY package*.json ./
+# Copy package files từ backend directory
+COPY backend/package*.json ./
 
 # Cài thư viện node (bao gồm cả dev dependencies cho tsx)
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy source code từ backend directory
+COPY backend/ .
 
 # Cài đặt tsx globally để có thể chạy TypeScript
 RUN npm install -g tsx
