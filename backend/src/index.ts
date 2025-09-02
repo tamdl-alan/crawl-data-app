@@ -21,6 +21,26 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54321/crawl-data",
 });
 
+// Health check endpoint for Railway
+app.get("/health", async (_req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({ 
+      status: "healthy",
+      timestamp: result.rows[0].now,
+      uptime: process.uptime(),
+      memory: process.memoryUsage()
+    });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    res.status(503).json({ 
+      status: "unhealthy",
+      error: "Database connection failed",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Test API endpoint
 app.get("/", async (_req, res) => {
   try {
