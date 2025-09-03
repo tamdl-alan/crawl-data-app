@@ -1,7 +1,7 @@
 # Sử dụng image Node chính thức
 FROM node:20-slim
 
-# Cài các dependencies cần thiết
+# Cài các dependencies cần thiết cho Chrome
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    xvfb \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 

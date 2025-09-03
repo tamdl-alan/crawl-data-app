@@ -352,13 +352,19 @@ const extraHTTPHeaders = {
   'Accept-Language': 'ja,ja-JP;q=0.9,en;q=0.8'
 }
 const defaultBrowserArgs = {
-  headless: 'true',
+  headless: 'new',
   executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
   args: [
     "--disable-setuid-sandbox",
     "--no-sandbox",
     "--disable-dev-shm-usage",
-    "--disable-gpu,"
+    "--disable-gpu",
+    "--disable-web-security",
+    "--disable-features=VizDisplayCompositor",
+    "--no-first-run",
+    "--no-zygote",
+    "--single-process",
+    "--disable-extensions"
   ]
 }
 
@@ -392,7 +398,10 @@ const sizeAndPriceGoatUrl = 'https://www.goat.com/web-api/v1/product_variants/bu
 async function extractDetailsFromProductGoatWithPage(page: any, goatUrl: string, goatId: string, type: string) {
   try {
     // Navigate to GOAT product page
-    await page.goto(goalDomain + '/' + goatUrl, { waitUntil: 'networkidle2' });
+    await page.goto(goalDomain + '/' + goatUrl, { 
+      waitUntil: 'networkidle2',
+      timeout: 60000 
+    });
 
     // Call GOAT API using the same page instance
     const goatSearchResponse = await page.evaluate(async (goatId: string, sizeAndPriceGoatUrl: string) => {
