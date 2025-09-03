@@ -37,8 +37,8 @@ WORKDIR /app
 # Copy package files từ backend directory
 COPY backend/package*.json ./
 
-# Cài thư viện node (bao gồm cả dev dependencies)
-RUN npm ci --include=dev
+# Cài thư viện node (tất cả dependencies)
+RUN npm install
 
 # Copy source code từ backend directory
 COPY backend/ .
@@ -48,7 +48,6 @@ RUN npm install -g tsx
 
 # Đặt biến môi trường trỏ đến Chrome
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
-ENV NODE_ENV=production
 ENV PORT=3000
 
 # Expose port
