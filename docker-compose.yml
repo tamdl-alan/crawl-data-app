@@ -52,7 +52,7 @@ services:
   frontend:
     build:
       context: ./front
-      dockerfile: front/Dockerfile
+      dockerfile: Dockerfile
     container_name: crawl-frontend
     ports:
       - "80:80"
