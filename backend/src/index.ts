@@ -15,7 +15,12 @@ import type { ProductModel } from "./models/product.model.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: true, // Chấp nhận tất cả origins
+  credentials: true, // Cho phép credentials
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 (puppeteer as any).use(StealthPlugin());
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54321/crawl-data",

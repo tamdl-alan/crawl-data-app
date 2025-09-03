@@ -13,7 +13,8 @@ import dayjs from "dayjs";
 // import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
 
-const API_BASE_URL = 'http://localhost:3000'
+// Use relative URLs for API calls (nginx will proxy them)
+const API_BASE_URL = ''
 
 const crawledData = ref([])
 const loading = ref(false)
