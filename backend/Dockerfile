@@ -37,8 +37,8 @@ WORKDIR /app
 # Copy package files từ backend directory
 COPY backend/package*.json ./
 
-# Cài thư viện node (bao gồm cả dev dependencies cho tsx)
-RUN npm install
+# Cài thư viện node (bao gồm cả dev dependencies)
+RUN npm ci --include=dev
 
 # Copy source code từ backend directory
 COPY backend/ .
