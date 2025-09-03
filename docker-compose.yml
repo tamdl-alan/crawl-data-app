@@ -24,8 +24,8 @@ services:
   # Backend API
   backend:
     build: 
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: crawl-backend
     ports:
       - "3000:3000"
@@ -52,7 +52,7 @@ services:
   frontend:
     build:
       context: ./front
-      dockerfile: Dockerfile
+      dockerfile: front/Dockerfile
     container_name: crawl-frontend
     ports:
       - "80:80"
