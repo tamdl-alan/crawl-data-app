@@ -57,6 +57,7 @@ app.get("/", async (_req, res) => {
   }
 });
 
+
 // Memory usage endpoint
 app.get("/memory", (_req, res) => {
   const memUsage = process.memoryUsage();
@@ -108,20 +109,39 @@ app.post("/crawl-all", async (req: Request, res: any) => {
     
     try {
       // Create single browser instance for all crawling
+      console.log('🚀 Launching browser for bulk crawl...');
       browser = await (puppeteer as any).launch({
         ...defaultBrowserArgs,
-        headless: 'true'
+        headless: 'new',
+        ignoreDefaultArgs: ['--disable-extensions'],
+        ignoreHTTPSErrors: true
       });
       
       // Create single page instance
       page = await browser.newPage();
+      
+      // Set page configuration
       await page.setUserAgent(userAgent);
       await page.setViewport(viewPortBrowser);
       await page.setExtraHTTPHeaders(extraHTTPHeaders);
+      page.setDefaultTimeout(60000); // 60 seconds timeout
+      
+      // Enable request interception for better performance
+      await page.setRequestInterception(true);
+      page.on('request', (req: any) => {
+        const resourceType = req.resourceType();
+        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+          req.abort(); // Block unnecessary resources
+        } else {
+          req.continue();
+        }
+      });
+      
+      console.log('✅ Browser and page configured successfully');
       
       // Step 1: Login to SNKRDUNK once for all operations
       console.log(`🔐 Step 1: Logging into SNKRDUNK...`);
-      await snkrdunkLogin();
+      await snkrdunkLogin(browser, page);
       console.log(`✅ SNKRDUNK login successful`);
       
       // Step 2: Crawl all SNKRDUNK data first and store in map
@@ -133,7 +153,7 @@ app.post("/crawl-all", async (req: Request, res: any) => {
           const { id, snkrdunk_api, type } = product;
           console.log(`🔄 Crawling SNKRDUNK data for product ${id}: ${snkrdunk_api}`);
           
-          const dataSnk = await crawlDataSnkrdunk(snkrdunk_api || '', type || 'SHOE');
+          const dataSnk = await crawlDataSnkrdunk(snkrdunk_api || '', type || 'SHOE', browser, page);
           snkrdunkDataMap.set(id, dataSnk);
           
           console.log(`✅ SNKRDUNK data for product ${id}: ${dataSnk?.length || 0} records`);
@@ -289,7 +309,7 @@ app.post("/crawl-data", async (req: Request, res: any) => {
     console.log(`------------Crawling data [${goat_url}] GOAT End: [${getVietnamTime()}]------------`);
 
     const mergedArr = mergeData(dataSnk, dataGoat);
-
+    
     if (!mergedArr?.length) {
       console.warn(`⚠️ No data found for Product ID: ${goat_url}`);
       if (!res.headersSent) {
@@ -311,7 +331,7 @@ app.post("/crawl-data", async (req: Request, res: any) => {
         }
       } catch (dbError: any) {
         console.error('❌ Error saving to database:', dbError.message);
-        if (!res.headersSent) {
+      if (!res.headersSent) {
           res.status(500).send({ 
             message: `❌ Error saving data to database: ${dbError.message}`,
             crawledData: mergedArr // Return crawled data even if DB save fails
@@ -362,9 +382,40 @@ const defaultBrowserArgs = {
     "--disable-web-security",
     "--disable-features=VizDisplayCompositor",
     "--no-first-run",
-    "--no-zygote",
-    "--single-process",
-    "--disable-extensions"
+    "--disable-extensions",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-background-networking",
+    "--disable-default-apps",
+    "--disable-sync",
+    "--disable-translate",
+    "--hide-scrollbars",
+    "--metrics-recording-only",
+    "--mute-audio",
+    "--no-default-browser-check",
+    "--safebrowsing-disable-auto-update",
+    "--disable-ipc-flooding-protection",
+    "--disable-hang-monitor",
+    "--disable-prompt-on-repost",
+    "--disable-client-side-phishing-detection",
+    "--disable-component-extensions-with-background-pages",
+    "--disable-background-downloads",
+    "--disable-add-to-shelf",
+    "--disable-client-side-phishing-detection",
+    "--disable-datasaver-prompt",
+    "--disable-desktop-notifications",
+    "--disable-domain-reliability",
+    "--disable-features=TranslateUI",
+    "--disable-ipc-flooding-protection",
+    "--disable-popup-blocking",
+    "--disable-prompt-on-repost",
+    "--disable-sync-preferences",
+    "--disable-web-resources",
+    "--enable-features=NetworkService,NetworkServiceLogging",
+    "--force-color-profile=srgb",
+    "--memory-pressure-off",
+    "--max_old_space_size=4096"
   ]
 }
 
@@ -539,9 +590,9 @@ function mergeData(dataSnk: any, dataGoal: any) {
   return merged || [];
 }
 
-async function crawlDataSnkrdunk(apiUrl: string, type: string) {
+async function crawlDataSnkrdunk(apiUrl: string, type: string, browser?: any, page?: any) {
   try {
-    await snkrdunkLogin();
+    await snkrdunkLogin(browser, page);
     const dataRes = await snkrdunkfetchData(apiUrl, type);
     const snkrMapped = getSizeAndPriceSnkrdunk(dataRes, type)
     console.log(`✅ Extracted Snkrdunk data!!!`);
@@ -553,48 +604,156 @@ async function crawlDataSnkrdunk(apiUrl: string, type: string) {
   }
 }
 
-async function snkrdunkLogin() {
-  const browser = await (puppeteer as any).launch(defaultBrowserArgs);
-  let page = null;
+async function snkrdunkLogin(browser?: any, page?: any) {
+  let localBrowser = browser;
+  let localPage = page;
+  let shouldCloseBrowser = false;
   
   try {
     if (cookieHeader) {
+      console.log('✅ Using existing SNKRDUNK session');
       return;
     }
-    page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 800 });
-    await page.setUserAgent(userAgent);
-    await page.goto(LOGIN_PAGE_SNKRDUNK, { 
-      waitUntil: 'networkidle2',
-      timeout: 30000 
+    
+    // Use provided browser/page or create new ones
+    if (!localBrowser) {
+      console.log('🔧 Creating new browser for SNKRDUNK login...');
+      localBrowser = await (puppeteer as any).launch({
+        ...defaultBrowserArgs,
+        headless: 'new'
+      });
+      shouldCloseBrowser = true;
+    }
+    
+    if (!localPage) {
+      localPage = await localBrowser.newPage();
+    }
+    
+    // Set page configuration
+    await localPage.setViewport({ width: 1280, height: 800 });
+    await localPage.setUserAgent(userAgent);
+    await localPage.setExtraHTTPHeaders(extraHTTPHeaders);
+    
+    // Set longer timeout for page operations
+    localPage.setDefaultTimeout(60000);
+    
+    console.log('🌐 Navigating to SNKRDUNK login page...');
+    await localPage.goto(LOGIN_PAGE_SNKRDUNK, { 
+      waitUntil: 'domcontentloaded',
+      timeout: 60000 
     });
     
-    // Wait for form elements to be ready
-    await page.waitForSelector('input[name="email"]', { timeout: 10000 });
-    await page.waitForSelector('input[name="password"]', { timeout: 10000 });
+    // Wait for page to be fully loaded
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Clear fields first
-    await page.evaluate(() => {
-      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
-      const passwordInput = document.querySelector('input[name="password"]') as HTMLInputElement;
-      if (emailInput) emailInput.value = '';
-      if (passwordInput) passwordInput.value = '';
+    // Wait for form elements to be ready with multiple selectors
+    console.log('⏳ Waiting for login form...');
+    try {
+      await localPage.waitForSelector('input[name="email"]', { timeout: 15000 });
+      await localPage.waitForSelector('input[name="password"]', { timeout: 15000 });
+    } catch (selectorError) {
+      console.log('⚠️ Form selectors not found, trying alternative selectors...');
+      // Try alternative selectors
+      await localPage.waitForSelector('input[type="email"], input[placeholder*="email"], input[placeholder*="Email"]', { timeout: 10000 });
+      await localPage.waitForSelector('input[type="password"], input[placeholder*="password"], input[placeholder*="Password"]', { timeout: 10000 });
+    }
+    
+    // Clear fields first and ensure they're focused
+    console.log('🧹 Clearing form fields...');
+    await localPage.evaluate(() => {
+      const emailInput = document.querySelector('input[name="email"], input[type="email"]') as HTMLInputElement;
+      const passwordInput = document.querySelector('input[name="password"], input[type="password"]') as HTMLInputElement;
+      if (emailInput) {
+        emailInput.focus();
+        emailInput.value = '';
+        emailInput.click();
+      }
+      if (passwordInput) {
+        passwordInput.focus();
+        passwordInput.value = '';
+        passwordInput.click();
+      }
     });
-    await page.type('input[name="email"]', EMAIL_SNKRDUNK, { delay: 100 });
-    await page.type('input[name="password"]', PASSWORD_SNKRDUNK, { delay: 100 });
-    const submitButton = await page.$('button[type="submit"], input[type="submit"]');
-    if (submitButton) {
-      await submitButton.click();
-    } else {
-      // Fallback to form submit
-      await page.evaluate(() => {
-        const form = document.querySelector('form');
-        if (form) form.submit();
+    
+    // Type credentials with human-like delays
+    console.log('⌨️ Entering credentials...');
+    await localPage.type('input[name="email"], input[type="email"]', EMAIL_SNKRDUNK, { delay: 150 });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await localPage.type('input[name="password"], input[type="password"]', PASSWORD_SNKRDUNK, { delay: 150 });
+    
+    // Wait a bit before submitting
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Try to find and click submit button
+    console.log('🔐 Submitting login form...');
+    
+    // Try multiple submit button selectors
+    let submitButton = await localPage.$('button[type="submit"]');
+    if (!submitButton) {
+      submitButton = await localPage.$('input[type="submit"]');
+    }
+    if (!submitButton) {
+      submitButton = await localPage.$('button[type="button"]');
+    }
+    if (!submitButton) {
+      // Try to find button by text content
+      submitButton = await localPage.evaluateHandle(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        return buttons.find(btn => 
+          btn.textContent?.toLowerCase().includes('login') ||
+          btn.textContent?.toLowerCase().includes('sign in') ||
+          btn.textContent?.toLowerCase().includes('submit')
+        ) || null;
       });
     }
-    const cookies = await page.cookies();
+    
+    if (submitButton) {
+      await submitButton.click();
+      console.log('✅ Submit button clicked');
+    } else {
+      // Fallback to form submit
+      console.log('⚠️ No submit button found, trying form submit...');
+      await localPage.evaluate(() => {
+        const form = document.querySelector('form');
+        if (form) {
+          form.submit();
+        } else {
+          // Try pressing Enter on password field
+          const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+          if (passwordInput) {
+            passwordInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13 }));
+          }
+        }
+      });
+    }
+    
+    // Wait for login to complete and check for success
+    console.log('⏳ Waiting for login to complete...');
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Check if login was successful by looking for redirect or success indicators
+    const currentUrl = localPage.url();
+    console.log(`📍 Current URL after login: ${currentUrl}`);
+    
+    // Get cookies
+    const cookies = await localPage.cookies();
     cookieHeader = cookies.map((c: any) => `${c.name}=${c.value}`).join('; ');
-    retryCount = 0;
+    
+    // Verify login success by checking for session cookies
+    const hasSessionCookie = cookies.some((cookie: any) => 
+      cookie.name.includes('session') || 
+      cookie.name.includes('auth') || 
+      cookie.name.includes('token') ||
+      cookie.name.includes('csrf')
+    );
+    
+    if (hasSessionCookie || currentUrl !== LOGIN_PAGE_SNKRDUNK) {
+      retryCount = 0;
+      console.log('✅ SNKRDUNK login successful');
+    } else {
+      throw new Error('Login failed - no session cookies found');
+    }
+    
   } catch (err: any) {
     console.error('❌ Snkrdunk login failed:', err?.message);
     
@@ -603,16 +762,20 @@ async function snkrdunkLogin() {
     retryCount++;
     if (retryCount < RETRY_LIMIT) {
       console.log(`🔄 Retrying login (${retryCount}/${RETRY_LIMIT})...`);
-      await snkrdunkLogin();
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait before retry
+      await snkrdunkLogin(localBrowser, localPage);
     } else {
       throw err;
     }
   } finally {
-    try {
-      if (page) await page.close();
-      await browser.close();
-    } catch (closeError: any) {
-      console.error('❌ Error closing browser:', closeError?.message);
+    // Only close browser if we created it
+    if (shouldCloseBrowser && localBrowser) {
+      try {
+        if (localPage) await localPage.close();
+        await localBrowser.close();
+      } catch (closeError: any) {
+        console.error('❌ Error closing browser:', closeError?.message);
+      }
     }
   }
 }
@@ -733,14 +896,14 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
       const url = `${sizeAndPriceGoatUrl}=${goatId}`;
       try {
         const res = await fetch(url, {
-          credentials: 'include',
-          headers: {
+        credentials: 'include',
+        headers: {
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept': 'application/json',
-            'Referer': 'https://www.goat.com',
-            'Origin': 'https://www.goat.com',
-          }
-        });
+          'Accept': 'application/json',
+          'Referer': 'https://www.goat.com',
+          'Origin': 'https://www.goat.com',
+        }
+      });
         return await res.json();
       } catch (error) {
         console.error('API fetch error:', error);
@@ -762,13 +925,13 @@ async function extractDetailsFromProductGoat(goatUrl: string, goatId: number, ty
     // Wait for image selector and extract
     try {
       await page.waitForSelector('div.swiper-slide-active', { timeout: 30000 });
-      $('div.swiper-slide-active').each((i: any, el: any) => {
-        const img = $(el).find('img');
-        if (img && !imgSrc && !imgAlt) {
+    $('div.swiper-slide-active').each((i: any, el: any) => {
+      const img = $(el).find('img');
+      if (img && !imgSrc && !imgAlt) {
           imgSrc = img.attr('src') || '';
           imgAlt = img.attr('alt') || '';
-        }
-      });
+      }
+    });
     } catch (error) {
       console.log('⚠️ Image selector not found, continuing without image...');
     }

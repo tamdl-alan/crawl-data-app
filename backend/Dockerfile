@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    xvfb \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +29,9 @@ RUN apt-get update && apt-get install -y \
 RUN wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt-get update && \
     apt-get install -y ./google-chrome.deb && \
-    rm google-chrome.deb
+    rm google-chrome.deb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Tạo thư mục app
 WORKDIR /app
