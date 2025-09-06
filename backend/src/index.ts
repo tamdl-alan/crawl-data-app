@@ -969,7 +969,7 @@ function getSizeAndPriceGoat(data: any, type: string) {
       const sizeGoat = item.sizeOption.presentation?.toString()?.trim();
       return {
         size_goat: type === PRODUCT_TYPE.SHOE ? sizeGoat : convertSizeClothes(sizeGoat?.toUpperCase()),
-        price_goat: item?.lowestPriceCents?.amount // Already in JPY
+        price_goat: item?.lowestPriceCents?.amount / 100 // Already in JPY
       };
     }
     return null;
