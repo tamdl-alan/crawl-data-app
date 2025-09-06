@@ -7,7 +7,7 @@ import { up as createCrawledDataTableUp, down as createCrawledDataTableDown } fr
 dotenv.config();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@localhost:54321/crawl-data",
+  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@13.250.102.203:54321/crawl-data",
 });
 
 async function runMigrations() {
