@@ -23,7 +23,7 @@ app.use(cors({
 }));
 (puppeteer as any).use(StealthPlugin());
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@13.250.102.203:54321/crawl-data",
+  connectionString: process.env.DATABASE_URL || "postgresql://postgres:admin-crawl@13.215.70.39:54321/crawl-data",
 });
 
 // Health check endpoint for Railway
@@ -1169,7 +1169,7 @@ cron.schedule(process.env.CRON_JOB_TIME || '0 * * * *', async () => {
     logMemoryUsage(`Before cron crawl-all`, memBefore);
     
     // Get server URL from environment variable
-    const serverUrl = process.env.SERVER_URL || `http://13.250.102.203:${process.env.PORT || 3000}`;
+    const serverUrl = process.env.SERVER_URL || `http://13.215.70.39:${process.env.PORT || 3000}`;
     const crawlAllUrl = `${serverUrl}/crawl-all`;
     
     console.log(`🌐 Cron: Calling crawl-all API at: ${crawlAllUrl}`);

@@ -47,7 +47,7 @@ services:
       - chrome_cache:/app/.cache
       - ./logs:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://13.250.102.203:3000/"]
+      test: ["CMD", "curl", "-f", "http://13.215.70.39:3000/"]
       interval: 30s
       timeout: 10s
       retries: 3

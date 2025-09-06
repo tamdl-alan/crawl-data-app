@@ -46,7 +46,7 @@ EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://13.250.102.203:80/ || exit 1
+  CMD curl -f http://13.215.70.39:80/ || exit 1
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

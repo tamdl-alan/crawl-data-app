@@ -33,7 +33,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - SERVER_URL=http://13.250.102.203:3000
+      - SERVER_URL=http://13.215.70.39:3000
       - DATABASE_URL=postgresql://postgres:admin-crawl@db:5432/crawl-data
       - EMAIL_SNKRDUNK=cathoiloi1135@gmail.com
       - PASSWORD_SNKRDUNK=Sy123456
