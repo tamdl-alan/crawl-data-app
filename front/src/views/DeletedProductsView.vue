@@ -204,6 +204,8 @@ const restoreItem = async (item) => {
     
     if (response.ok) {
       showNotification('Item restored successfully', 'success')
+      selectedItemsForBulkRestore.value = []
+      selectedItemsForBulkDelete.value = []
       await fetchDeletedData()
     } else {
       showNotification('Error restoring item: ' + result.error, 'danger')
@@ -235,6 +237,8 @@ const executeHardDelete = async () => {
     
     if (response.ok) {
       showNotification('Item permanently deleted from database', 'success')
+      selectedItemsForBulkRestore.value = []
+      selectedItemsForBulkDelete.value = []
       await fetchDeletedData()
     } else {
       showNotification('Error deleting item: ' + result.error, 'danger')
@@ -274,6 +278,7 @@ const bulkRestore = async () => {
     if (failed.length === 0) {
       showNotification(`${selectedItemsForBulkRestore.value.length} items restored successfully`, 'success')
       selectedItemsForBulkRestore.value = []
+      selectedItemsForBulkDelete.value = []
       isBulkRestoreModalActive.value = false
       await fetchDeletedData()
     } else {
@@ -305,6 +310,7 @@ const bulkHardDelete = async () => {
     
     if (failed.length === 0) {
       showNotification(`${selectedItemsForBulkDelete.value.length} items permanently deleted from database`, 'success')
+      selectedItemsForBulkRestore.value = []
       selectedItemsForBulkDelete.value = []
       isBulkDeleteModalActive.value = false
       await fetchDeletedData()
@@ -328,6 +334,12 @@ const handlePerPageChange = (perPageValue) => {
   perPage.value = perPageValue
   currentPage.value = 1
   fetchDeletedData()
+}
+
+// Handle selection change
+const handleSelectionChange = (selectedItems) => {
+  selectedItemsForBulkRestore.value = selectedItems
+  selectedItemsForBulkDelete.value = selectedItems
 }
 
 
@@ -415,9 +427,6 @@ onMounted(() => {
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
           Deleted Products
         </h1>
-        <p class="text-gray-600 dark:text-gray-400">
-          Manage deleted crawled data - restore items back to active list or hard delete from database
-        </p>
       </div>
 
       <!-- Notification -->
@@ -522,25 +531,25 @@ onMounted(() => {
           </div>
           
           <!-- Bulk Actions -->
-          <div v-if="selectedItemsForBulkRestore.length > 0 || selectedItemsForBulkDelete.length > 0" class="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 dark:text-gray-400">
                 {{ selectedItemsForBulkRestore.length + selectedItemsForBulkDelete.length }} item(s) selected
               </span>
               <div class="flex gap-2">
                 <BaseButton
-                  v-if="selectedItemsForBulkRestore.length > 0"
                   :icon="mdiRestore"
                   color="success"
                   :label="`Restore ${selectedItemsForBulkRestore.length} items`"
+                  :disabled="selectedItemsForBulkRestore.length === 0"
                   small
                   @click="isBulkRestoreModalActive = true"
                 />
                 <BaseButton
-                  v-if="selectedItemsForBulkDelete.length > 0"
                   :icon="mdiDeleteForever"
                   color="danger"
                   :label="`Hard Delete ${selectedItemsForBulkDelete.length} items`"
+                  :disabled="selectedItemsForBulkDelete.length === 0"
                   small
                   @click="isBulkDeleteModalActive = true"
                 />
@@ -555,9 +564,11 @@ onMounted(() => {
             :sortable="true"
             :per-page="perPage"
             :table-height="'430px'"
+            :hide-delete-button="true"
             @edit="handleEditData"
             @delete="handleDeleteData"
             @bulk-delete="handleBulkDelete"
+            @selection-change="handleSelectionChange"
           >
             <template #actions="{ item }">
               <BaseButtons type="justify-start lg:justify-end" no-wrap>
