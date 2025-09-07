@@ -25,7 +25,7 @@ CREATE TABLE crawled_data (
 
 ### Base URL
 ```
-http://localhost:3000/crawled-data
+http://13.215.70.39:3000/crawled-data
 ```
 
 ### 1. Get All Crawled Data
@@ -202,10 +202,10 @@ http://localhost:3000/crawled-data
 3. **Test the API:**
    ```bash
    # Get all crawled data
-   curl http://localhost:3000/crawled-data
+   curl http://13.215.70.39:3000/crawled-data
    
    # Create a crawled data record
-   curl -X POST http://localhost:3000/crawled-data \
+   curl -X POST http://13.215.70.39:3000/crawled-data \
      -H "Content-Type: application/json" \
      -d '{
        "product_url": "https://example.com/product",

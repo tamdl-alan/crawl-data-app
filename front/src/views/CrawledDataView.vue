@@ -25,6 +25,20 @@ const notification = ref({ show: false, message: '', type: 'info' })
 const isBulkDeleteModalActive = ref(false)
 const selectedItemsForBulkDelete = ref([])
 
+// Search and filter state
+const searchQuery = ref('')
+const filterBy = ref('')
+const filterValue = ref('')
+const filterOptions = [
+  { value: '', label: 'All Fields' },
+  { value: 'size_goat', label: 'Size GOAT' },
+  { value: 'size_snkrdunk', label: 'Size SNKRDUNK' },
+  { value: 'price_goat', label: 'Price GOAT' },
+  { value: 'price_snkrdunk', label: 'Price SNKRDUNK' },
+  { value: 'profit_amount', label: 'Profit Amount' },
+  { value: 'selling_price', label: 'Selling Price' }
+]
+
 // Pagination state
 const currentPage = ref(1)
 const perPage = ref(20)
@@ -108,7 +122,16 @@ const fetchCrawledData = async () => {
       sortOrder: 'desc'
     })
     
-    const response = await fetch(`${API_BASE_URL}/crawled-data?${params}`)
+    if (searchQuery.value.trim()) {
+      params.append('search', searchQuery.value.trim())
+    }
+    
+    if (filterBy.value && filterValue.value.trim()) {
+      params.append('filterBy', filterBy.value)
+      params.append('filterValue', filterValue.value.trim())
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/crawled-data?${params.toString()}`)
     const data = await response.json()
     
     crawledData.value = data.data || []
@@ -239,6 +262,27 @@ const handleSaveData = async (data) => {
   }
 }
 
+// Handle search
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchCrawledData()
+}
+
+// Handle filter
+const handleFilter = () => {
+  currentPage.value = 1
+  fetchCrawledData()
+}
+
+// Clear search and filter
+const clearSearchAndFilter = () => {
+  searchQuery.value = ''
+  filterBy.value = ''
+  filterValue.value = ''
+  currentPage.value = 1
+  fetchCrawledData()
+}
+
 const handleRefresh = () => {
   fetchCrawledData()
 }
@@ -305,6 +349,70 @@ onMounted(() => {
         {{ notification.message }}
       </NotificationBar>
 
+      <!-- Search and Filter Section -->
+      <CardBox class="mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- Search Input -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Search
+            </label>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by product name, URL, or note..."
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              @keyup.enter="handleSearch"
+            />
+          </div>
+          
+          <!-- Filter By -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Filter By
+            </label>
+            <select
+              v-model="filterBy"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              @change="handleFilter"
+            >
+              <option v-for="option in filterOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+          
+          <!-- Filter Value -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Filter Value
+            </label>
+            <input
+              v-model="filterValue"
+              type="text"
+              placeholder="Enter filter value..."
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              @keyup.enter="handleFilter"
+            />
+          </div>
+          
+          <!-- Action Buttons -->
+          <div class="flex flex-col justify-end gap-2">
+            <BaseButton
+              color="info"
+              label="Search"
+              @click="handleSearch"
+              :loading="loading"
+            />
+            <BaseButton
+              color="warning"
+              label="Clear"
+              @click="clearSearchAndFilter"
+            />
+          </div>
+        </div>
+      </CardBox>
+
       <CardBox class="mb-6 overflow-hidden" has-table>
         <div v-if="loading" class="p-6 text-center">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -314,31 +422,11 @@ onMounted(() => {
         <div v-else>
           <div class="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-600 pb-4 mb-4">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div class="flex flex-col gap-2">
-                  <h3 class="text-lg font-semibold">Crawled Data List</h3>
-                  <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 24% - 1500) - (Price snkrdunk + 10%)</p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-sm text-gray-600 dark:text-gray-400">Show:</span>
-                  <div class="relative">
-                    <select 
-                      v-model="perPage" 
-                      @change="handlePerPageChange(perPage)"
-                      class="appearance-none border border-gray-300 dark:border-gray-600 rounded px-3 py-1 pr-8 text-sm bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option v-for="option in pageSizeOptions" :key="option" :value="option">
-                        {{ option }}
-                      </option>
-                    </select>
-                  </div>
-                  <span class="text-sm text-gray-600 dark:text-gray-400">items per page</span>
-                </div>
+              <div class="flex flex-col gap-2">
+                <h3 class="text-lg font-semibold">Crawled Data List</h3>
+                <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 24% - 1500) - (Price snkrdunk + 10%)</p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-sm text-gray-600 dark:text-gray-400">
-                  {{ totalItems }} total items
-                </span>
                 <BaseButton
                   :icon="mdiRefresh"
                   label="Refresh"
@@ -363,12 +451,29 @@ onMounted(() => {
           />
           
           <!-- Custom Pagination -->
-          <div v-if="totalPages > 1" class="p-4 border-t border-gray-200 dark:border-slate-600">
+          <div class="p-4 border-t border-gray-200 dark:border-slate-600">
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-              <div class="text-sm text-gray-600 dark:text-gray-400">
-                Showing {{ ((currentPage - 1) * perPage) + 1 }} to {{ Math.min(currentPage * perPage, totalItems) }} of {{ totalItems }} items
+              <div class="flex items-center gap-4">
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  Showing {{ ((currentPage - 1) * perPage) + 1 }} to {{ Math.min(currentPage * perPage, totalItems) }} of {{ totalItems }} items
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-gray-600 dark:text-gray-400">Show:</span>
+                  <div class="relative">
+                    <select 
+                      v-model="perPage" 
+                      @change="handlePerPageChange(perPage)"
+                      class="appearance-none border border-gray-300 dark:border-gray-600 rounded px-3 py-1 pr-8 text-sm bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option v-for="option in pageSizeOptions" :key="option" :value="option">
+                        {{ option }}
+                      </option>
+                    </select>
+                  </div>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">items per page</span>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
+              <div v-if="totalPages > 1" class="flex items-center gap-2">
                 <BaseButton
                   :disabled="currentPage === 1"
                   color="whiteDark"

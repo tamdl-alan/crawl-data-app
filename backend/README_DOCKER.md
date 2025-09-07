@@ -18,7 +18,7 @@ cp .env.example .env
 
 # Hoặc tạo thủ công
 cat > .env << EOF
-DATABASE_URL=postgresql://postgres:admin-crawl@localhost:54325/crawl-data
+DATABASE_URL=postgresql://postgres:admin-crawl@13.215.70.39:54325/crawl-data
 EMAIL_SNKRDUNK=your_email@example.com
 PASSWORD_SNKRDUNK=your_password
 NODE_ENV=production
@@ -154,12 +154,12 @@ docker system prune -a
 ## 🌐 Access URLs
 
 ### API Endpoints
-- **Production**: http://localhost:3000
-- **Development**: http://localhost:3001
-- **Health Check**: http://localhost:3000/ (hoặc 3001)
+- **Production**: http://13.215.70.39:3000
+- **Development**: http://13.215.70.39:3001
+- **Health Check**: http://13.215.70.39:3000/ (hoặc 3001)
 
 ### Database
-- **Host**: localhost
+- **Host**: 13.215.70.39
 - **Port**: 54325
 - **Database**: crawl-data
 - **User**: postgres
@@ -173,13 +173,13 @@ docker system prune -a
 docker-compose exec db pg_isready -U postgres
 
 # Hoặc
-curl -f http://localhost:3000/
+curl -f http://13.215.70.39:3000/
 ```
 
 ### Backend Health
 ```bash
 # Kiểm tra backend
-curl http://localhost:3000/
+curl http://13.215.70.39:3000/
 
 # Xem container status
 docker-compose ps
@@ -220,7 +220,7 @@ PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome
 docker-compose logs backend
 
 # Kiểm tra health check
-curl http://localhost:3000/
+curl http://13.215.70.39:3000/
 
 # Restart service
 docker-compose restart backend

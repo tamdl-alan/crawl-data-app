@@ -12,6 +12,9 @@ export function createCrawledDataRoutes(pool: Pool): Router {
   // Get all crawled data
   router.get('/', (req, res) => crawledDataController.getAllCrawledData(req, res));
 
+  // Get all deleted crawled data (must be before /:id route)
+  router.get('/deleted', (req, res) => crawledDataController.getDeletedCrawledData(req, res));
+
   // Get a single crawled data record by ID
   router.get('/:id', (req, res) => crawledDataController.getCrawledDataById(req, res));
 
@@ -20,6 +23,12 @@ export function createCrawledDataRoutes(pool: Pool): Router {
 
   // Delete a crawled data record by ID
   router.delete('/:id', (req, res) => crawledDataController.deleteCrawledData(req, res));
+
+  // Restore a deleted crawled data record by ID
+  router.patch('/:id/restore', (req, res) => crawledDataController.restoreCrawledData(req, res));
+
+  // Permanently delete a deleted crawled data record by ID
+  router.delete('/:id/permanent', (req, res) => crawledDataController.permanentlyDeleteCrawledData(req, res));
 
   return router;
 }

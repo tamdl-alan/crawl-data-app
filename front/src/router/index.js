@@ -43,6 +43,15 @@ const routes = [
   },
   {
     meta: {
+      title: 'Deleted Products',
+      requiresAuth: true,
+    },
+    path: '/deleted-products',
+    name: 'deleted-products',
+    component: () => import('@/views/DeletedProductsView.vue'),
+  },
+  {
+    meta: {
       title: 'Profile',
       requiresAuth: true,
     },

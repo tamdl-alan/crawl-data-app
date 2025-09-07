@@ -32,6 +32,10 @@ const props = defineProps({
   tableHeight: {
     type: String,
     default: 'auto'
+  },
+  hideDeleteButton: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -366,7 +370,7 @@ watch(() => currentPage.value, () => {
     </CardBoxModal>
 
       <!-- Bulk Actions -->
-      <div class="p-3 bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
+      <div v-if="!hideDeleteButton" class="p-3 bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 dark:text-gray-400">

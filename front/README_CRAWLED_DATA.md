@@ -70,7 +70,7 @@ Crawled Data frontend là một trang quản lý dữ liệu đã crawl từ cá
 
 ## API Integration
 
-### Base URL: `http://localhost:3000/crawled-data`
+### Base URL: `http://13.215.70.39:3000/crawled-data`
 
 ### Endpoints:
 - `GET /crawled-data` - Lấy danh sách
@@ -83,7 +83,7 @@ Crawled Data frontend là một trang quản lý dữ liệu đã crawl từ cá
 
 ### 1. **Access the page:**
 ```
-http://localhost:5173/#/crawled-data
+http://13.215.70.39:5173/#/crawled-data
 ```
 
 ### 2. **Add new data:**

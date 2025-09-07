@@ -6,6 +6,7 @@ import {
   // mdiAlertCircle,
   // mdiSquareEditOutline,
   mdiTable,
+  mdiDelete,
   // mdiViewList,
   // mdiTelevisionGuide,
   // mdiResponsive,
@@ -33,6 +34,11 @@ export default [
     to: '/crawled-data',
     label: 'Crawled Data',
     icon: mdiTable,
+  },
+  {
+    to: '/deleted-products',
+    label: 'Deleted Products',
+    icon: mdiDelete,
   },
   // {
   //   to: '/forms',

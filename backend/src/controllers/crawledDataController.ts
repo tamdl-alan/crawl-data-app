@@ -46,25 +46,67 @@ export class CrawledDataController {
   // Get all crawled data
   async getAllCrawledData(req: Request, res: Response) {
     try {
-      const { sortBy = 'created_at', sortOrder = 'desc', page = 1, limit = 10 } = req.query;
+      const { 
+        sortBy = 'created_at', 
+        sortOrder = 'desc', 
+        page = 1, 
+        limit = 10,
+        search = '',
+        filterBy = '',
+        filterValue = ''
+      } = req.query;
+      
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       
       const validSortFields = ['id', 'product_name', 'price_goat', 'price_snkrdunk', 'profit_amount', 'selling_price', 'created_at'];
       const sortField = validSortFields.includes(sortBy as string) ? sortBy : 'created_at';
       const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
       
+      // Build WHERE conditions
+      let whereConditions = ['del_flag = 0'];
+      let queryParams: any[] = [];
+      let paramIndex = 1;
+      
+      // Add search condition
+      if (search && search.toString().trim()) {
+        whereConditions.push(`(
+          product_name ILIKE $${paramIndex} OR 
+          product_url ILIKE $${paramIndex} OR 
+          note ILIKE $${paramIndex}
+        )`);
+        queryParams.push(`%${search.toString().trim()}%`);
+        paramIndex++;
+      }
+      
+      // Add filter condition
+      if (filterBy && filterValue && filterValue.toString().trim()) {
+        const validFilterFields = ['size_goat', 'size_snkrdunk', 'price_goat', 'price_snkrdunk', 'profit_amount', 'selling_price'];
+        if (validFilterFields.includes(filterBy as string)) {
+          whereConditions.push(`${filterBy} = $${paramIndex}`);
+          queryParams.push(filterValue.toString().trim());
+          paramIndex++;
+        }
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
       const query = `
         SELECT * FROM crawled_data 
-        WHERE del_flag = 0
+        ${whereClause}
         ORDER BY ${sortField} ${order}
-        LIMIT $1 OFFSET $2
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
       
-      const countQuery = "SELECT COUNT(*) FROM crawled_data WHERE del_flag = 0";
+      const countQuery = `
+        SELECT COUNT(*) FROM crawled_data 
+        ${whereClause}
+      `;
+      
+      queryParams.push(parseInt(limit as string), offset);
       
       const [result, countResult] = await Promise.all([
-        this.pool.query(query, [parseInt(limit as string), offset]),
-        this.pool.query(countQuery)
+        this.pool.query(query, queryParams),
+        this.pool.query(countQuery, queryParams.slice(0, -2)) // Remove limit and offset for count
       ]);
       
       res.json({
@@ -72,7 +114,10 @@ export class CrawledDataController {
         total: parseInt(countResult.rows[0].count),
         page: parseInt(page as string),
         limit: parseInt(limit as string),
-        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string))
+        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string)),
+        search: search?.toString() || '',
+        filterBy: filterBy?.toString() || '',
+        filterValue: filterValue?.toString() || ''
       });
     } catch (error) {
       console.error("Error fetching crawled data:", error);
@@ -154,6 +199,124 @@ export class CrawledDataController {
     } catch (error) {
       console.error("Error deleting crawled data:", error);
       res.status(500).json({ error: "Failed to delete crawled data" });
+    }
+  }
+
+  // Get all deleted crawled data
+  async getDeletedCrawledData(req: Request, res: Response) {
+    try {
+      const { 
+        sortBy = 'updated_at', 
+        sortOrder = 'desc', 
+        page = 1, 
+        limit = 10,
+        search = '',
+        filterBy = '',
+        filterValue = ''
+      } = req.query;
+      
+      const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+      
+      const validSortFields = ['id', 'product_name', 'price_goat', 'price_snkrdunk', 'profit_amount', 'selling_price', 'created_at', 'updated_at'];
+      const sortField = validSortFields.includes(sortBy as string) ? sortBy : 'updated_at';
+      const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+      
+      // Build WHERE conditions
+      let whereConditions = ['del_flag = 2'];
+      let queryParams: any[] = [];
+      let paramIndex = 1;
+      
+      // Add search condition
+      if (search && search.toString().trim()) {
+        whereConditions.push(`(
+          product_name ILIKE $${paramIndex} OR 
+          product_url ILIKE $${paramIndex} OR 
+          note ILIKE $${paramIndex}
+        )`);
+        queryParams.push(`%${search.toString().trim()}%`);
+        paramIndex++;
+      }
+      
+      // Add filter condition
+      if (filterBy && filterValue && filterValue.toString().trim()) {
+        const validFilterFields = ['size_goat', 'size_snkrdunk', 'price_goat', 'price_snkrdunk', 'profit_amount', 'selling_price'];
+        if (validFilterFields.includes(filterBy as string)) {
+          whereConditions.push(`${filterBy} = $${paramIndex}`);
+          queryParams.push(filterValue.toString().trim());
+          paramIndex++;
+        }
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      const query = `
+        SELECT * FROM crawled_data 
+        ${whereClause}
+        ORDER BY ${sortField} ${order}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      
+      const countQuery = `
+        SELECT COUNT(*) FROM crawled_data 
+        ${whereClause}
+      `;
+      
+      queryParams.push(parseInt(limit as string), offset);
+      
+      const [result, countResult] = await Promise.all([
+        this.pool.query(query, queryParams),
+        this.pool.query(countQuery, queryParams.slice(0, -2)) // Remove limit and offset for count
+      ]);
+      
+      res.json({
+        data: result.rows,
+        total: parseInt(countResult.rows[0].count),
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string)),
+        search: search?.toString() || '',
+        filterBy: filterBy?.toString() || '',
+        filterValue: filterValue?.toString() || ''
+      });
+    } catch (error) {
+      console.error("Error fetching deleted crawled data:", error);
+      res.status(500).json({ error: "Failed to fetch deleted crawled data" });
+    }
+  }
+
+  // Restore a deleted crawled data record by ID
+  async restoreCrawledData(req: Request, res: Response) {
+    const { id } = req.params;
+    try {
+      const result = await this.pool.query(
+        "UPDATE crawled_data SET del_flag = 0, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND del_flag = 2 RETURNING *", 
+        [id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Deleted crawled data not found" });
+      }
+      res.status(200).json({ message: "Crawled data restored successfully", data: result.rows[0] });
+    } catch (error) {
+      console.error("Error restoring crawled data:", error);
+      res.status(500).json({ error: "Failed to restore crawled data" });
+    }
+  }
+
+  // Permanently delete a crawled data record by ID (hard delete)
+  async permanentlyDeleteCrawledData(req: Request, res: Response) {
+    const { id } = req.params;
+    try {
+      const result = await this.pool.query(
+        "DELETE FROM crawled_data WHERE id = $1 AND del_flag = 2 RETURNING *", 
+        [id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Deleted crawled data not found" });
+      }
+      res.status(200).json({ message: "Crawled data permanently deleted successfully" });
+    } catch (error) {
+      console.error("Error permanently deleting crawled data:", error);
+      res.status(500).json({ error: "Failed to permanently delete crawled data" });
     }
   }
 }

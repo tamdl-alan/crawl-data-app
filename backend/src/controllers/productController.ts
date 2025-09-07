@@ -34,8 +34,80 @@ export class ProductController {
   // Get all products
   async getAllProducts(req: Request, res: Response) {
     try {
-      const result = await this.pool.query("SELECT * FROM products ORDER BY created_at DESC");
-      res.json(result.rows);
+      const { 
+        sortBy = 'created_at', 
+        sortOrder = 'desc', 
+        page = 1, 
+        limit = 10,
+        search = '',
+        filterBy = '',
+        filterValue = ''
+      } = req.query;
+      
+      const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+      
+      const validSortFields = ['id', 'goat_url', 'goat_id', 'snkrdunk_api', 'type', 'created_at', 'updated_at'];
+      const sortField = validSortFields.includes(sortBy as string) ? sortBy : 'created_at';
+      const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+      
+      // Build WHERE conditions
+      let whereConditions: string[] = [];
+      let queryParams: any[] = [];
+      let paramIndex = 1;
+      
+      // Add search condition
+      if (search && search.toString().trim()) {
+        whereConditions.push(`(
+          goat_url ILIKE $${paramIndex} OR 
+          goat_id::text ILIKE $${paramIndex} OR 
+          snkrdunk_api ILIKE $${paramIndex} OR
+          type ILIKE $${paramIndex}
+        )`);
+        queryParams.push(`%${search.toString().trim()}%`);
+        paramIndex++;
+      }
+      
+      // Add filter condition
+      if (filterBy && filterValue && filterValue.toString().trim()) {
+        const validFilterFields = ['goat_id', 'type'];
+        if (validFilterFields.includes(filterBy as string)) {
+          whereConditions.push(`${filterBy} = $${paramIndex}`);
+          queryParams.push(filterValue.toString().trim());
+          paramIndex++;
+        }
+      }
+      
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+      
+      const query = `
+        SELECT * FROM products 
+        ${whereClause}
+        ORDER BY ${sortField} ${order}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      
+      const countQuery = `
+        SELECT COUNT(*) FROM products 
+        ${whereClause}
+      `;
+      
+      queryParams.push(parseInt(limit as string), offset);
+      
+      const [result, countResult] = await Promise.all([
+        this.pool.query(query, queryParams),
+        this.pool.query(countQuery, queryParams.slice(0, -2)) // Remove limit and offset for count
+      ]);
+      
+      res.json({
+        data: result.rows,
+        total: parseInt(countResult.rows[0].count),
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / parseInt(limit as string)),
+        search: search?.toString() || '',
+        filterBy: filterBy?.toString() || '',
+        filterValue: filterValue?.toString() || ''
+      });
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ error: "Failed to fetch products" });

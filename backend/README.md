@@ -15,7 +15,7 @@ docker-compose up -d
 ### 3. Tạo file .env (nếu chưa có)
 Tạo file `.env` trong thư mục `backend` với nội dung:
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:54325/postgres
+DATABASE_URL=postgresql://postgres:postgres@13.215.70.39:54325/postgres
 PORT=3000
 NODE_ENV=development
 ```
@@ -39,7 +39,7 @@ npm start
 ```
 
 ### 5. Kiểm tra API
-Sau khi chạy thành công, truy cập: http://localhost:3000
+Sau khi chạy thành công, truy cập: http://13.215.70.39:3000
 
 ## Cấu trúc project
 - `src/index.ts` - Entry point của ứng dụng
