@@ -351,7 +351,21 @@ watch(() => currentPage.value, () => {
     <CardBoxModal v-model="isModalActive" title="Item Details">
       <div v-if="selectedItem">
         <div v-for="column in columns" :key="column.key" class="mb-3">
-          <strong>{{ column.label }}:</strong> {{ selectedItem[column.key] }}
+          <strong>{{ column.label }}:</strong> 
+          <span v-if="column.key === 'image_url' && selectedItem[column.key]">
+            <img 
+              :src="selectedItem[column.key]" 
+              :alt="selectedItem.product_name || 'Product Image'"
+              class="mt-2 max-w-full h-auto max-h-48 rounded border object-cover"
+              @error="$event.target.style.display='none'"
+            />
+          </span>
+          <span v-else-if="column.key === 'image_url' && !selectedItem[column.key]">
+            No image available
+          </span>
+          <span v-else>
+            {{ selectedItem[column.key] }}
+          </span>
         </div>
       </div>
     </CardBoxModal>
