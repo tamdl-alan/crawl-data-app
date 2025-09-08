@@ -7,6 +7,7 @@ import DataTable from '@/components/DataTable.vue'
 import ProductForm from '@/components/ProductForm.vue'
 import TypeBadge from '@/components/TypeBadge.vue'
 import CardBox from '@/components/CardBox.vue'
+import CardBoxModal from '@/components/CardBoxModal.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import BaseButton from '@/components/BaseButton.vue'
@@ -22,6 +23,7 @@ const editingProduct = ref(null)
 const isEditMode = ref(false)
 const notification = ref({ show: false, message: '', type: 'info' })
 const selectedItems = ref([])
+const isCrawlAllModalActive = ref(false)
 
 // Search and filter state
 const searchQuery = ref('')
@@ -290,15 +292,16 @@ const handleCrawlData = async (product) => {
   }
 }
 
-const handleCrawlAll = async () => {
+const handleCrawlAll = () => {
   if (!products.value.length) {
     showNotification('No products to crawl', 'warning')
     return
   }
   
-  const confirmed = confirm(`Are you sure you want to crawl all ${products.value.length} products? This may take a while.`)
-  if (!confirmed) return
-  
+  isCrawlAllModalActive.value = true
+}
+
+const executeCrawlAll = async () => {
   let successCount = 0
   let errorCount = 0
   
@@ -339,6 +342,8 @@ const handleCrawlAll = async () => {
     `Crawl All completed: ${successCount} successful, ${errorCount} failed`, 
     errorCount === 0 ? 'success' : 'warning'
   )
+  
+  isCrawlAllModalActive.value = false
 }
 
 const showNotification = (message, type = 'info') => {
@@ -558,5 +563,20 @@ onMounted(() => {
       :is-edit="isEditMode"
       @save="handleSaveProduct"
     />
+
+    <!-- Crawl All Confirmation Modal -->
+    <CardBoxModal
+      v-model="isCrawlAllModalActive"
+      title="Confirm Crawl All"
+      button="danger"
+      button-label="Yes, Crawl All"
+      has-cancel
+      @confirm="executeCrawlAll"
+    >
+      <p>
+        Are you sure you want to crawl all <strong>{{ products.length }}</strong> products? 
+        This may take a while and will process each product individually.
+      </p>
+    </CardBoxModal>
   </LayoutAuthenticated>
 </template>
