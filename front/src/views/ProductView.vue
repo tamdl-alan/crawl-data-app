@@ -21,6 +21,7 @@ const showForm = ref(false)
 const editingProduct = ref(null)
 const isEditMode = ref(false)
 const notification = ref({ show: false, message: '', type: 'info' })
+const selectedItems = ref([])
 
 // Search and filter state
 const searchQuery = ref('')
@@ -243,6 +244,11 @@ const getVisiblePages = () => {
   return pages
 }
 
+// Handle selection change
+const handleSelectionChange = (selectedItemsList) => {
+  selectedItems.value = selectedItemsList
+}
+
 const handleRefresh = () => {
   fetchProducts()
 }
@@ -440,27 +446,29 @@ onMounted(() => {
         
         <div v-else>
           <div class="flex justify-between items-center mb-4">
-            <div>
-              <h3 class="text-lg font-semibold">Product Mappings List</h3>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Manage product mappings for crawling data from GOAT and SNKRDUNK</p>
-            </div>
-            <div>
-              <BaseButton
-                :icon="mdiDownload"
-                label="Crawl All"
-                color="danger"
-                small
-                class="mr-2"
-                @click="handleCrawlAll"
-              />
-              <BaseButton
-                :icon="mdiRefresh"
-                label="Refresh"
-                color="info"
-                small
-                @click="handleRefresh"
-              />
-            </div>
+              <div>
+                <h3 class="text-lg font-semibold">Product Mappings List</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Manage product mappings for crawling data from GOAT and SNKRDUNK</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600 dark:text-gray-400">{{ selectedItems.length }} item(s) selected</span>
+                <div class="flex gap-2">
+                  <BaseButton
+                    :icon="mdiDownload"
+                    label="Crawl All"
+                    color="danger"
+                    small
+                    @click="handleCrawlAll"
+                  />
+                  <BaseButton
+                    :icon="mdiRefresh"
+                    label="Refresh"
+                    color="info"
+                    small
+                    @click="handleRefresh"
+                  />
+                </div>
+              </div>
           </div>
           <DataTable
             :data="products"
@@ -471,6 +479,7 @@ onMounted(() => {
             @edit="handleEditProduct"
             @delete="handleDeleteProduct"
             @crawl="handleCrawlData"
+            @selection-change="handleSelectionChange"
           >
             <template #actions="{ item, handleView, handleEdit, handleDelete }">
               <ProductActions 

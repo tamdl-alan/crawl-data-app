@@ -149,16 +149,19 @@ const checked = (isChecked, item) => {
 
 const checkAll = (isChecked) => {
   if (isChecked) {
-    // Show confirmation modal for check all (both checked and indeterminate states)
-    // isCheckAllModalActive.value = true
+    // Add all current page items to checked rows
+    const currentPageItems = itemsPaginated.value.filter(item => 
+      !checkedRows.value.some(checkedItem => checkedItem.id === item.id)
+    )
+    checkedRows.value = [...checkedRows.value, ...currentPageItems]
   } else {
     // Remove all current page items from checked rows
     checkedRows.value = checkedRows.value.filter(item => 
       !itemsPaginated.value.some(pageItem => pageItem.id === item.id)
     )
-    updateAllCheckedState()
-    emit('selection-change', checkedRows.value)
   }
+  updateAllCheckedState()
+  emit('selection-change', checkedRows.value)
 }
 
 const confirmCheckAll = () => {

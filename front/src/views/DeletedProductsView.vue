@@ -141,13 +141,6 @@ const columns = [
     width: '150px',
     minWidth: '120px',
     render: (value) => value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'
-  },
-  { 
-    key: 'actions', 
-    label: 'Actions', 
-    sortable: false,
-    width: '120px',
-    minWidth: '100px'
   }
 ]
 

@@ -283,6 +283,11 @@ const clearSearchAndFilter = () => {
   fetchCrawledData()
 }
 
+// Handle selection change
+const handleSelectionChange = (selectedItemsList) => {
+  selectedItemsForBulkDelete.value = selectedItemsList
+}
+
 const handleRefresh = () => {
   fetchCrawledData()
 }
@@ -426,16 +431,18 @@ onMounted(() => {
                 <h3 class="text-lg font-semibold">Crawled Data List</h3>
                 <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 24% - 1500) - (Price snkrdunk + 10%)</p>
               </div>
-              <div class="flex items-center gap-2">
-                <BaseButton
-                  :icon="mdiRefresh"
-                  label="Refresh"
-                  color="success"
-                  small
-                  class="mr-3"
-                  @click="handleRefresh"
-                />
-              </div>
+               <div class="flex items-center gap-4">
+                 <span class="text-sm text-gray-600 dark:text-gray-400">{{ selectedItemsForBulkDelete.length }} item(s) selected</span>
+                 <div class="flex gap-2">
+                   <BaseButton
+                     :icon="mdiRefresh"
+                     label="Refresh"
+                     color="success"
+                     small
+                     @click="handleRefresh"
+                   />
+                 </div>
+               </div>
             </div>
           </div>
           <DataTable
@@ -447,6 +454,7 @@ onMounted(() => {
             :table-height="'430px'"
             @edit="handleEditData"
             @delete="handleDeleteData"
+            @selection-change="handleSelectionChange"
             @bulk-delete="handleBulkDelete"
           />
           
