@@ -73,8 +73,8 @@ app.get("/memory", (_req, res) => {
   });
 });
 
-// -------------Crawl All Data Start------------------
-app.post("/crawl-all", async (req: Request, res: any) => {
+// -------------Crawl All Data Function Start------------------
+async function crawlAllData() {
   const memBefore = process.memoryUsage();
   logMemoryUsage(`Before crawling all data`, memBefore);
   
@@ -92,11 +92,11 @@ app.post("/crawl-all", async (req: Request, res: any) => {
     console.log(`📋 Found ${products.length} products to crawl (limited to 10 for testing)`);
     
     if (products.length === 0) {
-      return res.status(200).json({ 
+      return { 
         message: 'No active products found to crawl',
         totalProducts: 0,
         completedAt: getVietnamTime()
-      });
+      };
     }
     
     const results: any[] = [];
@@ -180,8 +180,10 @@ app.post("/crawl-all", async (req: Request, res: any) => {
           // Get SNKRDUNK data from map
           const dataSnk = snkrdunkDataMap.get(id) || [];
           
-          // Crawl GOAT data using shared page (optimized)
+          // Crawl GOAT data using shared page (optimized version of extractDetailsFromProductGoat)
+          console.log(`🌐 API: Starting GOAT extraction for product ${id}...`);
           const dataGoat = await extractDetailsFromProductGoatWithPage(page, goat_url || '', goat_id || '', type || 'SHOE');
+          console.log(`✅ API: GOAT extraction completed for product ${id}: ${dataGoat?.length || 0} records`);
           
           // Merge data
           const mergedArr = mergeData(dataSnk, dataGoat);
@@ -262,17 +264,17 @@ app.post("/crawl-all", async (req: Request, res: any) => {
     
     console.log(`✅ Optimized bulk crawl completed: ${successCount}/${products.length} successful`);
     
-    res.status(200).json({
+    return {
       message: `Optimized bulk crawl completed successfully`,
       ...summary
-    });
+    };
     
   } catch (error: any) {
     console.error(`❌ Error in optimized bulk crawl:`, error.message);
-    res.status(500).json({ 
+    return { 
       message: `Optimized bulk crawl failed: ${error.message}`,
       completedAt: getVietnamTime()
-    });
+    };
   } finally {
     // Log memory usage after crawling
     const memAfter = process.memoryUsage();
@@ -283,6 +285,25 @@ app.post("/crawl-all", async (req: Request, res: any) => {
     if (global.gc) {
       global.gc();
     }
+  }
+}
+
+// -------------Crawl All Data API Endpoint------------------
+app.post("/crawl-all", async (req: Request, res: any) => {
+  try {
+    const result = await crawlAllData();
+    
+    if (result.message?.includes('failed')) {
+      res.status(500).json(result);
+    } else {
+      res.status(200).json(result);
+    }
+  } catch (error: any) {
+    console.error(`❌ Error in crawl-all API:`, error.message);
+    res.status(500).json({ 
+      message: `Crawl-all API failed: ${error.message}`,
+      completedAt: getVietnamTime()
+    });
   }
 });
 
@@ -445,9 +466,20 @@ const sizeAndPriceGoatUrl = 'https://www.goat.com/web-api/v1/product_variants/bu
 
 
 
-// Helper function to extract GOAT data with shared page (optimized)
+// Helper function to extract GOAT data with shared page (optimized version of extractDetailsFromProductGoat)
 async function extractDetailsFromProductGoatWithPage(page: any, goatUrl: string, goatId: string, type: string) {
+  if (!goatId || !goatUrl) {
+    console.error(`❌ Invalid goat data: goatId: ${goatId}, goatUrl: ${goatUrl}`);
+    return [];
+  }
+
   try {
+    // Set cookies for GOAT (same as original function)
+    await page.setCookie(
+      { name: 'currency', value: 'JPY', domain: 'www.goat.com', path: '/', secure: true },
+      { name: 'country', value: 'JP', domain: 'www.goat.com', path: '/', secure: true },
+    );
+
     // Navigate to GOAT product page
     await page.goto(goalDomain + '/' + goatUrl, { 
       waitUntil: 'networkidle2',
@@ -511,11 +543,15 @@ async function extractDetailsFromProductGoatWithPage(page: any, goatUrl: string,
       }
     });
 
-    console.log(`✅ Extracted Goat data with shared page!!!`);
+    console.log(`✅ Extracted Goat data!!!`);
+    console.log(`📊 GOAT Data Summary: ${products?.length || 0} records extracted`);
+    if (products && products.length > 0) {
+      console.log(`📋 GOAT Records:`, products.map((p: any) => `${p.size_goat}: ¥${p.price_goat}`).join(', '));
+    }
     return products || [];
     
   } catch (error: any) {
-    console.error('❌ Error extracting GOAT data with shared page:', error.message);
+    console.error('❌ Error extracting GOAT data:', error.message);
     return [];
   }
 }
@@ -1164,46 +1200,26 @@ app.use('/crawled-data', createCrawledDataRoutes(pool));
 cron.schedule(process.env.CRON_JOB_TIME || '0 * * * *', async () => {
   console.log(`🕐 Cron job started at ${getVietnamTime()}`);
   
-  const memBefore = process.memoryUsage();
   try {
-    logMemoryUsage(`Before cron crawl-all`, memBefore);
+    console.log(`🔄 Cron: Calling crawl-all function directly...`);
     
-    // Get server URL from environment variable
-    const serverUrl = process.env.SERVER_URL || `http://13.215.70.39:${process.env.PORT || 3000}`;
-    const crawlAllUrl = `${serverUrl}/crawl-all`;
+    // Call the crawl-all function directly (same as API endpoint)
+    // Note: crawlAllData() already handles memory logging and garbage collection
+    const result = await crawlAllData();
     
-    console.log(`🌐 Cron: Calling crawl-all API at: ${crawlAllUrl}`);
-    
-    // Call the existing crawl-all API internally
-    const crawlAllResponse = await fetch(crawlAllUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const result = await crawlAllResponse.json();
-    
-    if (crawlAllResponse.ok) {
-      console.log(`✅ Cron: Successfully triggered crawl-all`);
-      console.log(`📊 Cron: Summary:`, result);
-    } else {
+    if (result.message?.includes('failed')) {
       console.error(`❌ Cron: crawl-all failed:`, result.message);
+    } else {
+      console.log(`✅ Cron: Successfully completed crawl-all`);
+      console.log(`📊 Cron: Summary:`, result);
+      console.log(`📊 Cron: Total products processed: ${result.totalProducts || 'N/A'}`);
+      console.log(`📊 Cron: Success count: ${(result as any).successCount || 'N/A'}`);
+      console.log(`📊 Cron: Error count: ${(result as any).errorCount || 'N/A'}`);
     }
     
   } catch (error: any) {
-    console.error(`❌ Cron: Error calling crawl-all:`, error.message);
+    console.error(`❌ Cron: Error calling crawl-all function:`, error.message);
   } finally {
-    // Log memory usage after crawling
-    const memAfter = process.memoryUsage();
-    logMemoryUsage(`After cron crawl-all`, memAfter);
-    logMemoryChanges(`Cron Bulk Crawl`, memBefore, memAfter);
-    
-    // Force garbage collection
-    if (global.gc) {
-      global.gc();
-    }
-    
     console.log(`🕐 Cron job completed at ${getVietnamTime()}`);
   }
 }, {

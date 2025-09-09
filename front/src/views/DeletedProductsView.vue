@@ -40,7 +40,7 @@ const filterOptions = [
 
 // Pagination state
 const currentPage = ref(1)
-const perPage = ref(20)
+const perPage = ref(100)
 const totalItems = ref(0)
 const totalPages = ref(0)
 const pageSizeOptions = [10, 20, 50, 100]
