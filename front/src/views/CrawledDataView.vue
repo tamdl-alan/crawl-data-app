@@ -429,7 +429,7 @@ onMounted(() => {
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div class="flex flex-col gap-2">
                 <h3 class="text-lg font-semibold">Crawled Data List</h3>
-                <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 24% - 1500) - (Price snkrdunk + 10%)</p>
+                <p class="text-sm text-red-600 dark:text-gray-400">Profit Amount = (Price Goat - 14% - 1500) - (Price snkrdunk + 10%)</p>
               </div>
                <div class="flex items-center gap-4">
                  <span class="text-sm text-gray-600 dark:text-gray-400">{{ selectedItemsForBulkDelete.length }} item(s) selected</span>
