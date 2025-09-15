@@ -4,6 +4,21 @@ import { Pool } from 'pg';
 export class CrawledDataController {
   constructor(private pool: Pool) {}
 
+  // Helper function to get current time in Vietnam timezone (UTC+7)
+  private getVietnamTime(): string {
+    const now = new Date();
+    const vietnamTime = new Date(now.getTime() + (7 * 60 * 60 * 1000)); // UTC+7
+    
+    const year = vietnamTime.getUTCFullYear();
+    const month = String(vietnamTime.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(vietnamTime.getUTCDate()).padStart(2, '0');
+    const hours = String(vietnamTime.getUTCHours()).padStart(2, '0');
+    const minutes = String(vietnamTime.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(vietnamTime.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  }
+
   // Create a new crawled data record
   async createCrawledData(req: Request, res: Response) {
     const { 
@@ -164,15 +179,18 @@ export class CrawledDataController {
     }
 
     try {
+      // Get current time in Vietnam timezone (UTC+7) - same as other functions
+      const vietnamTime = this.getVietnamTime();
+      
       const result = await this.pool.query(
         `UPDATE crawled_data 
          SET product_url = $1, product_name = $2, size_goat = $3, price_goat = $4,
              size_snkrdunk = $5, price_snkrdunk = $6, profit_amount = $7,
-             selling_price = $8, image_url = $9, note = $10, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $11 AND del_flag = 0
+             selling_price = $8, image_url = $9, note = $10, updated_at = $11
+         WHERE id = $12 AND del_flag = 0
          RETURNING *`,
         [product_url, product_name, size_goat, price_goat, size_snkrdunk, 
-         price_snkrdunk, profit_amount, selling_price, image_url, note, id]
+         price_snkrdunk, profit_amount, selling_price, image_url, note, vietnamTime, id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Crawled data not found" });
@@ -188,9 +206,12 @@ export class CrawledDataController {
   async deleteCrawledData(req: Request, res: Response) {
     const { id } = req.params;
     try {
+      // Get current time in Vietnam timezone (UTC+7) - same as other functions
+      const vietnamTime = this.getVietnamTime();
+      
       const result = await this.pool.query(
-        "UPDATE crawled_data SET del_flag = 2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND del_flag = 0 RETURNING *", 
-        [id]
+        "UPDATE crawled_data SET del_flag = 2, updated_at = $1 WHERE id = $2 AND del_flag = 0 RETURNING *", 
+        [vietnamTime, id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Crawled data not found" });
