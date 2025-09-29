@@ -36,6 +36,10 @@ const props = defineProps({
   hideDeleteButton: {
     type: Boolean,
     default: false
+  },
+  sortStorageKey: {
+    type: String,
+    default: 'default-sort'
   }
 })
 
@@ -52,6 +56,36 @@ const isAllChecked = ref(false)
 const sortField = ref('')
 const sortDirection = ref('asc')
 const selectedItem = ref(null)
+
+// Load sort state from localStorage on component mount
+const loadSortState = () => {
+  try {
+    const savedSort = localStorage.getItem(props.sortStorageKey)
+    if (savedSort) {
+      const { field, direction } = JSON.parse(savedSort)
+      sortField.value = field
+      sortDirection.value = direction
+    }
+  } catch (error) {
+    console.warn('Failed to load sort state:', error)
+  }
+}
+
+// Save sort state to localStorage
+const saveSortState = () => {
+  try {
+    const sortState = {
+      field: sortField.value,
+      direction: sortDirection.value
+    }
+    localStorage.setItem(props.sortStorageKey, JSON.stringify(sortState))
+  } catch (error) {
+    console.warn('Failed to save sort state:', error)
+  }
+}
+
+// Load sort state when component mounts
+loadSortState()
 
 // Computed properties
 const itemsPaginated = computed(() => {
@@ -214,6 +248,9 @@ const handleSort = (field) => {
     sortField.value = field
     sortDirection.value = 'asc'
   }
+  
+  // Save sort state to localStorage
+  saveSortState()
 }
 
 const getSortIcon = (field) => {

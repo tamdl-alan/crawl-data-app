@@ -452,6 +452,7 @@ onMounted(() => {
             :sortable="true"
             :per-page="perPage"
             :table-height="'430px'"
+            :sort-storage-key="'crawled-data-sort'"
             @edit="handleEditData"
             @delete="handleDeleteData"
             @selection-change="handleSelectionChange"
@@ -481,15 +482,25 @@ onMounted(() => {
                   <span class="text-sm text-gray-600 dark:text-gray-400">items per page</span>
                 </div>
               </div>
-              <div v-if="totalPages > 1" class="flex items-center gap-2">
+              <div class="flex items-center gap-2">
+                <!-- First Page Button -->
+                <BaseButton
+                  :disabled="currentPage === 1"
+                  color="info"
+                  small
+                  @click="handlePageChange(1)"
+                  title="Đi tới trang đầu"
+                  class="font-bold"
+                  label="First"
+                />
+                
                 <BaseButton
                   :disabled="currentPage === 1"
                   color="whiteDark"
                   small
                   @click="handlePageChange(currentPage - 1)"
-                >
-                  Previous
-                </BaseButton>
+                  label="Previous"
+                />
                 
                 <div class="flex items-center gap-1">
                   <BaseButton
@@ -508,9 +519,18 @@ onMounted(() => {
                   color="whiteDark"
                   small
                   @click="handlePageChange(currentPage + 1)"
-                >
-                  Next
-                </BaseButton>
+                  label="Next"
+                />
+                
+                <!-- Last Page Button -->
+                <BaseButton
+                  :disabled="currentPage === totalPages"
+                  color="info"
+                  small
+                  @click="handlePageChange(totalPages)"
+                  class="font-bold"
+                  label="Last"
+                />
               </div>
             </div>
           </div>
